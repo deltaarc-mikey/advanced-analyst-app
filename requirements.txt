@@ -10,3 +10,4 @@ tastytrade
 python-docx
 fpdf
 feedparser
+langchain>=0.1.14
