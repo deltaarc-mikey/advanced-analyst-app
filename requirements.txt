@@ -1,6 +1,5 @@
 streamlit
 pandas
-pandas-ta
 plotly
 matplotlib
 requests
