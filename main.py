@@ -1,59 +1,47 @@
-import streamlit as st
-import openai
-import google.generativeai as genai
-from dotenv import load_dotenv
 import os
+import requests
+import streamlit as st
+from dotenv import load_dotenv
 
-# Load API keys from .env
+# Load environment variables
 load_dotenv()
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+UW_API_KEY = os.getenv("UW_API_KEY")  # <- Paste your key into .env file as UW_API_KEY
 
-# Set OpenAI key using new client method
-client = openai.OpenAI(api_key=OPENAI_API_KEY)
+# Streamlit UI
+st.set_page_config(page_title="Delta Ghost AI: Options Screener", layout="wide")
+st.title("📊 Delta Ghost AI: Options Chain Screener")
 
-# Set Gemini key
-genai.configure(api_key=GEMINI_API_KEY)
-
-# UI
-st.title("📈 Delta Ghost AI: Smart Trade Reports")
-ticker = st.text_input("Enter a ticker (e.g., TSLA, AAPL):")
+ticker = st.text_input("Enter a ticker symbol (e.g., TSLA, AAPL):")
 
 if ticker:
-    raw_prompt = f"""{ticker.upper()} is a publicly traded company. Provide analysis including stock overview, risk, opportunity, and sentiment.
-Also include Reddit sentiment if available and any recent spikes in Google Trends."""
+    st.info(f"🔍 Fetching options data for {ticker.upper()}...")
 
-    # ChatGPT Summary
-    st.markdown("## 🧠 ChatGPT Summary")
-    try:
-        chat_response = client.chat.completions.create(
-            model="gpt-4",
-            messages=[
-                {"role": "system", "content": "You are a professional financial analyst."},
-                {"role": "user", "content": raw_prompt}
-            ],
-            temperature=0.5,
-            max_tokens=500
-        )
-        gpt_summary = chat_response.choices[0].message.content
-        st.success("✅ ChatGPT Responded")
-        st.write(gpt_summary)
+    # API Call
+    endpoint = f"https://phx.unusualwhales.com/api/historic_chains/{ticker}"
+    headers = {"Authorization": f"Bearer {UW_API_KEY}"}
+    response = requests.get(endpoint, headers=headers)
 
-    except Exception as e:
-        st.error(f"❌ ChatGPT Error:\n\n{e}")
+    if response.status_code == 200:
+        chains = response.json().get("chains", [])
 
-    # Gemini Summary
-    st.markdown("## 🌐 Gemini Summary")
-    try:
-        model = genai.GenerativeModel(model_name="gemini-1.5-pro-latest")
-        gemini_response = model.generate_content(raw_prompt)
-        st.success("✅ Gemini Responded")
-        st.write(gemini_response.text)
+        # Filter: Ask < $0.50 and Volume > 1000
+        filtered = [
+            c for c in chains
+            if c.get("ask", 999) < 0.5 and c.get("volume", 0) > 1000
+        ]
 
-    except Exception as e:
-        st.error(f"❌ Gemini Error:\n\n{e}")
-
-    # Raw Input for Debug
-    st.markdown("## 🗂️ Raw Text (Used for Summary)")
-    with st.expander("Click to view raw input"):
-        st.code(raw_prompt)
+        if filtered:
+            st.success(f"✅ Found {len(filtered)} qualifying contracts:")
+            for contract in filtered:
+                st.write({
+                    "Symbol": contract.get("ticker"),
+                    "Strike": contract.get("strike"),
+                    "Type": contract.get("type"),
+                    "Expiration": contract.get("expiration"),
+                    "Ask": contract.get("ask"),
+                    "Volume": contract.get("volume"),
+                })
+        else:
+            st.warning("⚠️ No contracts matched the criteria (ask < $0.50, volume > 1000).")
+    else:
+        st.error(f"❌ API Error {response.status_code}: {response.text}")
