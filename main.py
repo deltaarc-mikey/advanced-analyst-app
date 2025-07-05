@@ -33,10 +33,10 @@ reddit = praw.Reddit(
 pytrends = TrendReq(hl='en-US', tz=360)
 
 # --- Debug: Show Loaded Secrets ---
-st.sidebar.subheader("🔑 Reddit API Debug")
-st.sidebar.write("Client ID:", os.getenv("REDDIT_CLIENT_ID"))
-st.sidebar.write("Client Secret:", os.getenv("REDDIT_CLIENT_SECRET"))
-st.sidebar.write("User Agent:", os.getenv("REDDIT_USER_AGENT"))
+# st.sidebar.subheader("🔑 Reddit API Debug")
+# st.sidebar.write("Client ID:", os.getenv("REDDIT_CLIENT_ID"))
+# st.sidebar.write("Client Secret:", os.getenv("REDDIT_CLIENT_SECRET"))
+# st.sidebar.write("User Agent:", os.getenv("REDDIT_USER_AGENT"))
 
 # --- Helper: Generate Report ---
 def generate_docx(text, filename="Trade_Analysis_Report.docx"):
