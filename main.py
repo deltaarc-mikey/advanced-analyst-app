@@ -58,9 +58,9 @@ def Google_Search_for_news(query):
         else: return f"No search results found for '{query}'."
     except Exception as e: return f"An error occurred during the search: {e}"
 
-# vvv NEW HEATMAP FUNCTION vvv
+# vvv UPDATED HEATMAP FUNCTION vvv
 def generate_technical_heatmap(tickers_string):
-    """Generates a heatmap of key technical indicators."""
+    """Generates a heatmap of key technical indicators with robust error handling."""
     tickers = [ticker.strip().upper() for ticker in tickers_string.split(',') if ticker.strip()]
     if not tickers: return "No tickers provided."
 
@@ -68,25 +68,36 @@ def generate_technical_heatmap(tickers_string):
 
     for ticker in tickers:
         try:
-            data = yf.download(ticker, period='4mo', progress=False, auto_adjust=True) # Use auto_adjust to get clean close prices
-            if data.empty: continue
-            
-            # Manual RSI Calculation
+            data = yf.download(ticker, period='4mo', progress=False, auto_adjust=True)
+            if data.empty or len(data) < 51: continue # Ensure enough data for 50-day SMA
+
+            # --- More Robust Indicator Calculations ---
+            # RSI Calculation
             delta = data['Close'].diff()
             gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
             loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-            rs = gain / loss
+            
+            # Avoid division by zero for RSI
+            rs = gain / loss.replace(0, 1e-10) 
             rsi = 100 - (100 / (1 + rs))
             
-            # Manual SMA Calculation
+            # SMA Calculation
             sma20 = data['Close'].rolling(window=20).mean()
             sma50 = data['Close'].rolling(window=50).mean()
-            
-            # Get latest values
+
+            # Get latest values safely
             latest_close = data['Close'].iloc[-1]
-            indicator_df.loc[ticker, 'RSI'] = rsi.iloc[-1]
-            indicator_df.loc[ticker, 'Above_SMA50'] = 'Yes' if latest_close > sma50.iloc[-1] else 'No'
-            indicator_df.loc[ticker, 'SMA20_Slope'] = 'Up' if sma20.iloc[-1] > sma20.iloc[-2] else 'Down'
+            rsi_val = rsi.iloc[-1]
+            sma50_val = sma50.iloc[-1]
+            sma20_val = sma20.iloc[-1]
+            prev_sma20_val = sma20.iloc[-2]
+
+            # Assign to DataFrame only if all values are valid
+            if all(pd.notna(v) for v in [rsi_val, sma50_val, sma20_val, prev_sma20_val]):
+                indicator_df.loc[ticker, 'RSI'] = rsi_val
+                indicator_df.loc[ticker, 'Above_SMA50'] = 'Yes' if latest_close > sma50_val else 'No'
+                indicator_df.loc[ticker, 'SMA20_Slope'] = 'Up' if sma20_val > prev_sma20_val else 'Down'
+            # --- End of robust calculations ---
 
         except Exception:
             continue
@@ -94,39 +105,30 @@ def generate_technical_heatmap(tickers_string):
     indicator_df.dropna(how='all', inplace=True)
     if indicator_df.empty: return "Could not generate heatmap for any of the given tickers."
 
-    # Create the heatmap plot
+    # --- Plotting logic is unchanged ---
     fig, ax = plt.subplots(figsize=(10, len(indicator_df) * 0.5))
     ax.axis('off')
-
     colors = [[(0.8, 0.2, 0.2), (0.2, 0.8, 0.2)][val == 'Yes'] if val in ['Yes', 'No'] else (0.9,0.9,0.9) for val in indicator_df['Above_SMA50']]
     sl_colors = [[(0.8, 0.2, 0.2), (0.2, 0.8, 0.2)][val == 'Up'] if val in ['Up', 'Down'] else (0.9,0.9,0.9) for val in indicator_df['SMA20_Slope']]
-    
     rsi_values = pd.to_numeric(indicator_df['RSI'], errors='coerce')
     rsi_norm = mcolors.Normalize(vmin=20, vmax=80)
     rsi_colors = plt.cm.RdYlGn_r(rsi_norm(rsi_values))
-
     table_data = indicator_df.values.T
     cell_colours = [rsi_colors.tolist()] + [colors] + [sl_colors]
-
     table = ax.table(cellText=[[f'{v:.1f}' if isinstance(v, float) else v for v in row] for row in table_data],
                      rowLabels=indicator_df.columns, colLabels=indicator_df.index,
                      cellColours=cell_colours, cellLoc='center', loc='center')
-    table.auto_set_font_size(False)
-    table.set_fontsize(10)
-    table.scale(1.2, 1.5)
-
+    table.auto_set_font_size(False); table.set_fontsize(10); table.scale(1.2, 1.5)
     buf = io.BytesIO()
     plt.savefig(buf, format='png', bbox_inches='tight', pad_inches=0.1)
     buf.seek(0)
     plt.close(fig)
     return buf
 
-# --- Streamlit User Interface ---
+# --- Streamlit User Interface (is unchanged) ---
 st.set_page_config(layout="wide")
 st.title("📈 Advanced AI Analyst")
-
-# --- Section 1: Charting Tool ---
-st.header("Price Charts 👻🧸")
+st.header("Delta Ghost 📈 Price Chart")
 chart_ticker_input = st.text_input("Enter stock tickers separated by commas:", "AAPL, MSFT, NVDA", key="chart_input")
 if st.button("Generate Chart"):
     if chart_ticker_input:
@@ -135,11 +137,8 @@ if st.button("Generate Chart"):
             if isinstance(result, str): st.error(result)
             else: st.image(result)
     else: st.warning("Please enter at least one ticker for the chart.")
-
 st.markdown("---")
-
-# --- Section 2: Technical Heatmap Tool ---
-st.header("📊 Technical Indicators Heatmap")
+st.header("📊 𝚫👻 Indicators Heatmap")
 heatmap_ticker_input = st.text_input("Enter stock tickers for the heatmap:", "TSLA, RIVN, LCID, VRT, FDX, HIMS", key="heatmap_input")
 if st.button("Generate Heatmap"):
     if heatmap_ticker_input:
@@ -148,11 +147,8 @@ if st.button("Generate Heatmap"):
             if isinstance(result, str): st.error(result)
             else: st.image(result)
     else: st.warning("Please enter at least one ticker for the heatmap.")
-
 st.markdown("---")
-
-# --- Section 3: AI Research Assistant ---
-st.header("👻Δ Delta Ghost Research Assistant")
+st.header("👻𝚫 Delta Ghost Research Assistant")
 if 'agent_executor' not in st.session_state:
     from langchain_google_genai import ChatGoogleGenerativeAI
     from langchain.agents import Tool, AgentExecutor, create_react_agent, hub
@@ -161,16 +157,4 @@ if 'agent_executor' not in st.session_state:
     prompt = hub.pull("hwchase17/react")
     agent = create_react_agent(llm, tools, prompt)
     st.session_state.agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
-
-ai_question = st.text_input("Ask for news or recent developments:", "Latest news on AI infrastructure stocks", key="ai_input")
-if st.button("Ask AI"):
-    if ai_question:
-        with st.spinner("AI is searching..."):
-            string_io = io.StringIO()
-            with contextlib.redirect_stdout(string_io):
-                 response = st.session_state.agent_executor.invoke({"input": ai_question})
-            thought_process = string_io.getvalue()
-            output = response.get("output")
-            st.markdown("### AI Response:"); st.write(output)
-            with st.expander("Show Thought Process"): st.text(thought_process)
-    else: st.warning("Please enter a question for the AI.")
+ai_question = st.text_input
