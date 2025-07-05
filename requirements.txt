@@ -1,10 +1,10 @@
 streamlit
 yfinance
 pandas
-pandas-ta
 matplotlib
+pandas-ta
+requests
 feedparser
 openai
-google-api-python-client
-requests
-streamlit-option-menu
+streamlit_option_menu
+pandas
