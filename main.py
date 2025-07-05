@@ -158,3 +158,10 @@ elif selected_tab == "AI Trade Signal Center":
                 st.write(output)
             except Exception as e:
                 st.error(f"OpenAI error: {e}")
+
+    docx_path = generate_docx(result or output)
+        try:
+            file_id = upload_to_drive(docx_path, "Delta_Ghost_Report.docx")
+            st.success(f"Uploaded to Google Drive. File ID: {file_id}")
+        except Exception as e:
+            st.warning(f"Failed to upload to Google Drive: {e}")
