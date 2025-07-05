@@ -12,3 +12,4 @@ google-auth-oauthlib
 langchain
 langchain-google-genai
 plotly
+python-docx
