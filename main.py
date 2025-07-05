@@ -83,8 +83,8 @@ if selected_tab == "Enter Ticker":
             if filtered:
                 df = pd.DataFrame(filtered)
                 st.dataframe(df[["contract_symbol", "type", "strike", "expiration", "ask", "volume"]])
-                else:
-                    st.info("No matching options under current filter.")
+            else:
+                st.info("No matching options under current filter.")
             else:
                 st.error(f"Unexpected response format: {chains}")
                     
