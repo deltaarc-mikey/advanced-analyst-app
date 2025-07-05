@@ -3,24 +3,22 @@ streamlit
 langchain
 langchain-google-genai
 
-# Data Fetching & Web Scraping
+# Web & Data Handling
 requests
 beautifulsoup4
 lxml
-pandas
 
-# Financial Data Libraries
+# Specific Financial Data Libraries
 yfinance
 tradingview-ta
 
+# Data, Analysis & Dependencies (with specific versions)
+pandas==2.2.2
+numpy==1.26.4
+pandas-ta==0.3.14b
+setuptools
 
-# Charting & Visualization
-matplotlib
-
-# Google Web Search
+# Google Search
 google-api-python-client
 google-auth-httplib2
 google-auth-oauthlib
-
-pandas-ta
-setuptools
