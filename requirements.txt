@@ -1,7 +1,7 @@
 streamlit
 yfinance
 pandas
-pandas-ta
+ta
 matplotlib
 google-api-python-client
 langchain
