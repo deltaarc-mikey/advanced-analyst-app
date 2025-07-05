@@ -40,7 +40,7 @@ def generate_price_chart(tickers_string):
     plt.close(fig)
     return buf
 
-def Google Search_for_news(query):
+def Google_Search_for_news(query):
     try:
         api_key = st.secrets["GOOGLE_API_KEY"]
         cse_id = st.secrets["GOOGLE_CSE_ID"]
@@ -86,7 +86,7 @@ if 'agent_executor' not in st.session_state:
     from langchain import hub # CORRECTED IMPORT
     
     llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=st.secrets["GOOGLE_API_KEY"])
-    tools = [Tool(name="Google Search_for_news", func=Google Search_for_news, description="Use to search for recent news on a company or topic.")]
+    tools = [Tool(name="Google_Search_for_news", func=Google_Search_for_news, description="Use to search for recent news on a company or topic.")]
     prompt = hub.pull("hwchase17/react")
     agent = create_react_agent(llm, tools, prompt)
     st.session_state.agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
