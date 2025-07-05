@@ -71,36 +71,25 @@ if selected_tab == "Enter Ticker":
             fig.update_layout(title=f"{ticker} - Price + RSI", xaxis_title="Date", yaxis_title="Price")
             st.plotly_chart(fig)
 
-            # Unusual Whales options chain
-            st.subheader("📊 Filtered Options Chain (Under $2, Volume > 500)")
-            uw_url = f"https://phx.unusualwhales.com/api/historic_chains/{ticker.upper()}"
-            headers = {"Authorization": f"Bearer {UW_API_KEY}"}
-            response = requests.get(uw_url, headers=headers)
-            if response.status_code == 200:
-                chains = response.json()
-            if isinstance(chains, list) and isinstance(chains[0], dict):
-                filtered = [c for c in chains if c.get("ask", 999) < 2 and c.get("volume", 0) > 500]
-            if filtered:
-                df = pd.DataFrame(filtered)
-                st.dataframe(df[["contract_symbol", "type", "strike", "expiration", "ask", "volume"]])
-            else:
-                st.info("No matching options under current filter.")
-            else:
-                st.error(f"Unexpected response format: {chains}")
-                    
-                if filtered:
-                    df = pd.DataFrame(filtered)
-                    st.dataframe(df[["contract_symbol", "type", "strike", "expiration", "ask", "volume"]])
-                else:
-                    st.info("No matching options under current filter.")
-            else:
-                st.error("Failed to fetch options from Unusual Whales.")
+           # Unusual Whales options chain
+st.subheader("📊 Filtered Options Chain (Under $2, Volume > 500)")
+uw_url = f"https://phx.unusualwhales.com/api/historic_chains/{ticker.upper()}"
+headers = {"Authorization": f"Bearer {UW_API_KEY}"}
+response = requests.get(uw_url, headers=headers)
 
-            if datetime.today().weekday() >= 5:
-                st.warning("⚠️ The market is currently closed. Data may be stale.")
-
-        except Exception as e:
-            st.error(f"Error loading ticker data: {e}")
+try:
+    chains = response.json()
+    if isinstance(chains, list) and len(chains) > 0 and isinstance(chains[0], dict):
+        filtered = [c for c in chains if c.get("ask", 999) < 2 and c.get("volume", 0) > 500]
+        if filtered:
+            df = pd.DataFrame(filtered)
+            st.dataframe(df[["contract_symbol", "type", "strike", "expiration", "ask", "volume"]])
+        else:
+            st.info("No matching options under current filter.")
+    else:
+        st.warning(f"Unusual Whales returned no usable data: {chains}")
+except Exception as e:
+    st.error(f"Error parsing Unusual Whales response: {e}")
 
 # --- Reddit + Google Trends Tab ---
 elif selected_tab == "Reddit + Trends":
