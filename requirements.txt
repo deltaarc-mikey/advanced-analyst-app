@@ -11,3 +11,4 @@ python-docx
 fpdf
 feedparser
 langchain>=0.1.14
+tastytrade>=1.1.0
