@@ -9,3 +9,7 @@ pytrends
 python-docx
 openai
 yfinance
+scikit-learn
+beautifulsoup4
+lxml
+tqdm
