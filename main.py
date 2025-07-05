@@ -1,115 +1,117 @@
 import streamlit as st
 import pandas as pd
-import pandas_ta as ta
-import plotly.graph_objects as go
+import json
+import datetime
 from docx import Document
 from fpdf import FPDF
-from datetime import datetime
-import requests
-import json
-from langchain.agents import Tool, AgentExecutor, create_react_agent
-from langchain import hub
-from tastytrade.session import TastySession  # Updated import
-from tastytrade.order import Order
-from tastytrade.instruments import get_instruments
-from tastytrade.utils import pretty_json
 
-# --- App Title ---
+# Set Streamlit page config
 st.set_page_config(page_title="Delta Ghost AI Trade Engine", layout="wide")
+
+# App Title
 st.title("Delta Ghost AI Trade Engine")
-st.caption("Built with Gemini + ChatGPT + Unusual Whales Intelligence")
+st.markdown("Built with Gemini + ChatGPT + Unusual Whales Intelligence")
 
-# --- Sidebar Navigation ---
-menu = st.sidebar.radio("Navigation", ["Screener & Charts", "AI Trade Signal Center", "Options & Uploads"])
+# Tabs
+tabs = st.tabs(["📊 Screener & Charts", "📈 AI Trade Signal Center", "📁 Options & Uploads"])
 
-# --- Shared Session State ---
-if "gemini_signals" not in st.session_state:
-    st.session_state["gemini_signals"] = []
+# --- TAB 1: Screener ---
+with tabs[0]:
+    st.header("Step 1: Screener & Technical Charts")
 
-# --- Helper Functions ---
-def generate_word_report(content, filename):
-    doc = Document()
-    doc.add_heading("Delta Ghost Trade Report", 0)
-    for paragraph in content:
-        doc.add_paragraph(paragraph)
-    doc.save(filename)
-    return filename
-
-def generate_pdf_report(content, filename):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", size=12)
-    pdf.cell(200, 10, txt="Delta Ghost AI Trade Report", ln=True, align='C')
-    for line in content:
-        pdf.cell(200, 10, txt=line, ln=True, align='L')
-    pdf.output(filename)
-    return filename
-
-def parse_options_file(uploaded_file):
-    df = pd.read_csv(uploaded_file)
-    return df
-
-def schedule_gemini_pull():
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    st.success(f"✅ Gemini signal pulled at {now}")
-    # Placeholder logic
-    st.session_state["gemini_signals"].append({"time": now, "signal": "AAPL breakout @ 210+ expected"})
-
-def handle_webhook():
-    st.info("Webhook Received! Processing TradingView Alert...")
-    # Insert logic here to parse TradingView alert JSON and act accordingly
-
-def tastytrade_execute_trade(symbol, action, quantity, order_type="Limit"):
-    try:
-        session = TastySession("your_email", "your_password")
-        instruments = get_instruments(session, symbol=symbol, instrument_type="Equity Option")
-        # Example only: You need to filter specific options chain for strike, expiry, etc.
-        order = Order(session, action=action, symbol=symbol, quantity=quantity, order_type=order_type)
-        result = order.place()
-        st.success(f"Trade Executed: {pretty_json(result)}")
-    except Exception as e:
-        st.error(f"❌ Trade Failed: {e}")
-
-# --- Screener & Charts Page ---
-if menu == "Screener & Charts":
-    st.subheader("Step 1: Screener & Technical Charts")
     tickers = st.text_area("Paste top tickers (e.g., NVDA, AMD, VRT):", height=100)
     if tickers:
-        tickers_list = [t.strip().upper() for t in tickers.split(",")]
-        st.write("You entered:", tickers_list)
-        # Placeholder for actual charting or TA engine
+        symbols = [x.strip().upper() for x in tickers.split(",") if x.strip()]
+        st.success(f"🟢 {len(symbols)} symbols loaded.")
+        st.write(symbols)
 
-# --- AI Trade Signal Center ---
-elif menu == "AI Trade Signal Center":
-    st.subheader("Step 2: Auto-Generated AI Trade Plans")
-    if st.button("Schedule Gemini Pull"):
-        schedule_gemini_pull()
+# --- TAB 2: AI Trade Signal Generator ---
+with tabs[1]:
+    st.header("Step 2: AI Signal Engine")
 
-    if st.session_state["gemini_signals"]:
-        for sig in st.session_state["gemini_signals"]:
-            st.info(f"🧠 Gemini Signal @ {sig['time']} — {sig['signal']}")
+    col1, col2 = st.columns(2)
+    with col1:
+        gemini_text = st.text_area("Paste Gemini signal (from Google Trends or Chat Export):", height=200)
+    with col2:
+        gpt_output = st.text_area("Paste ChatGPT output (LLM output from prompt):", height=200)
 
-    export_option = st.selectbox("Export Report Format", ["Word", "PDF"])
-    if st.button("Generate Trade Report"):
-        sample_report = ["Signal: AAPL bullish breakout expected", "Entry target: $210", "Exit target: $225"]
-        if export_option == "Word":
-            filename = generate_word_report(sample_report, "delta_ghost_trade_report.docx")
-            with open(filename, "rb") as f:
-                st.download_button("📥 Download Word Report", f, file_name=filename)
+    if st.button("🧠 Generate Trade Plan"):
+        if gemini_text or gpt_output:
+            st.subheader("📋 AI-Generated Trade Summary")
+
+            summary = f"""### 🔍 Summary:
+**Gemini Insights:**  
+{gemini_text if gemini_text else 'N/A'}
+
+**ChatGPT Logic:**  
+{gpt_output if gpt_output else 'N/A'}
+
+**🛠️ Recommended Actions:**  
+- Review tickers for technical confirmation  
+- Queue limit or market orders based on trade confidence  
+- Cross-verify against Unusual Whales / Barchart setups"""
+
+            st.markdown(summary)
+
+            # Download Word
+            doc = Document()
+            doc.add_heading("Delta Ghost Trade Summary", 0)
+            doc.add_paragraph(f"Date: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            doc.add_heading("Gemini Output", level=1)
+            doc.add_paragraph(gemini_text)
+            doc.add_heading("ChatGPT Output", level=1)
+            doc.add_paragraph(gpt_output)
+            doc.add_heading("Recommended Strategy", level=1)
+            doc.add_paragraph("Review tickers for confirmation. Queue trade setups or alerts.")
+
+            word_file = "/mnt/data/DeltaGhost_Trade_Summary.docx"
+            doc.save(word_file)
+            st.download_button("⬇️ Download Word Report", data=open(word_file, "rb"), file_name="Trade_Summary.docx")
+
+            # Download PDF
+            pdf = FPDF()
+            pdf.add_page()
+            pdf.set_font("Arial", size=12)
+            pdf.multi_cell(0, 10, f"Delta Ghost Trade Summary\n\nDate: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            pdf.multi_cell(0, 10, f"\nGemini Output:\n{gemini_text}")
+            pdf.multi_cell(0, 10, f"\nChatGPT Output:\n{gpt_output}")
+            pdf.multi_cell(0, 10, "\nRecommended Strategy:\nReview tickers for confirmation. Queue trade setups or alerts.")
+            pdf_file = "/mnt/data/DeltaGhost_Trade_Summary.pdf"
+            pdf.output(pdf_file)
+            st.download_button("⬇️ Download PDF Report", data=open(pdf_file, "rb"), file_name="Trade_Summary.pdf")
         else:
-            filename = generate_pdf_report(sample_report, "delta_ghost_trade_report.pdf")
-            with open(filename, "rb") as f:
-                st.download_button("📥 Download PDF Report", f, file_name=filename)
+            st.warning("Please paste at least one AI input to generate a trade plan.")
 
-# --- Options Chain Upload Page ---
-elif menu == "Options & Uploads":
-    st.subheader("Step 3: Upload Option Chains or Setup Webhooks")
-    uploaded_file = st.file_uploader("Upload Options CSV", type="csv")
+# --- TAB 3: Upload + Webhook ---
+with tabs[2]:
+    st.header("Step 3: Upload Options Chains + TradingView Alerts")
+
+    uploaded_file = st.file_uploader("📁 Upload options chain CSV or alert JSON", type=["csv", "json"])
     if uploaded_file:
-        df = parse_options_file(uploaded_file)
-        st.dataframe(df.head())
-        st.success("File parsed successfully. Displaying top rows.")
+        filename = uploaded_file.name
+        st.success(f"Uploaded: {filename}")
 
-    st.subheader("TradingView Webhook Listener")
-    if st.button("Simulate Webhook Alert"):
-        handle_webhook()
+        if filename.endswith(".csv"):
+            df = pd.read_csv(uploaded_file)
+            st.write(df.head())
+
+        elif filename.endswith(".json"):
+            alert_data = json.load(uploaded_file)
+            st.json(alert_data)
+
+            if isinstance(alert_data, dict):
+                st.subheader("🧠 Auto-Generated Alert Summary")
+                ticker = alert_data.get("ticker") or alert_data.get("symbol", "Unknown")
+                reason = alert_data.get("reason", "No reason provided.")
+                strike = alert_data.get("strike", "N/A")
+                expiry = alert_data.get("expiry", "N/A")
+
+                st.markdown(f"""📌 **Trade Alert Received**  
+- Ticker: `{ticker}`  
+- Reason: *{reason}*  
+- Strike: `{strike}`  
+- Expiry: `{expiry}`  
+- Action: Review chart + confirm order manually in TastyTrade  
+""")
+            else:
+                st.warning("JSON does not match expected alert format.")
