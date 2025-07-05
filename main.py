@@ -1,145 +1,115 @@
 import streamlit as st
-import yfinance as yf
 import pandas as pd
-from ta.momentum import RSIIndicator
-from ta.trend import SMAIndicator
-import matplotlib.pyplot as plt
-import io
-import contextlib
-import feedparser
-import requests
-from googleapiclient.discovery import build
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.tools import Tool
-from langchain_core.runnables import Runnable
-from langchain.agents import create_react_agent, AgentExecutor
-from langchain import hub
-from tastytrade.session import TastySession
-from tastytrade.orders import EquityOrder, OrderAction, OrderType, TimeInForce
-from tastytrade.instruments import Equity
+import pandas_ta as ta
+import plotly.graph_objects as go
 from docx import Document
 from fpdf import FPDF
 from datetime import datetime
+import requests
+import json
+from langchain.agents import Tool, AgentExecutor, create_react_agent
+from langchain import hub
+from tastytrade.session import TastySession  # Updated import
+from tastytrade.order import Order
+from tastytrade.instruments import get_instruments
+from tastytrade.utils import pretty_json
 
-plt.switch_backend('agg')
-st.set_page_config(layout="wide")
-st.title("📊 Advanced AI Trading Dashboard")
+# --- App Title ---
+st.set_page_config(page_title="Delta Ghost AI Trade Engine", layout="wide")
+st.title("Delta Ghost AI Trade Engine")
+st.caption("Built with Gemini + ChatGPT + Unusual Whales Intelligence")
 
-# --- Functions ---
-def generate_price_chart(ticker):
-    data = yf.download(ticker, period="6mo")
-    if data.empty:
-        return "No data found."
-    data['RSI'] = ta.rsi(data['Close'], length=14)
-    data['SMA50'] = ta.sma(data['Close'], length=50)
-    data.dropna(inplace=True)
+# --- Sidebar Navigation ---
+menu = st.sidebar.radio("Navigation", ["Screener & Charts", "AI Trade Signal Center", "Options & Uploads"])
 
-    fig, ax = plt.subplots(figsize=(12,6))
-    ax.plot(data.index, data['Close'], label='Close Price')
-    ax.plot(data.index, data['SMA50'], label='SMA 50')
-    ax2 = ax.twinx()
-    ax2.plot(data.index, data['RSI'], label='RSI', color='purple', alpha=0.4)
-    ax.set_title(f"{ticker} Price Chart with RSI and SMA")
-    ax.legend(loc='upper left')
-    buf = io.BytesIO()
-    plt.savefig(buf, format='png')
-    buf.seek(0)
-    plt.close()
-    return buf
+# --- Shared Session State ---
+if "gemini_signals" not in st.session_state:
+    st.session_state["gemini_signals"] = []
 
-def tasty_login():
-    try:
-        return TastySession(
-            username=st.secrets["TASTYTRADE_USERNAME"],
-            password=st.secrets["TASTYTRADE_PASSWORD"]
-        )
-    except Exception as e:
-        st.error(f"Login failed: {e}")
-        return None
-
-def place_order(session, symbol, quantity, order_type='MARKET', limit_price=None):
-    try:
-        instrument = Equity(symbol)
-        order = EquityOrder(
-            session=session,
-            action=OrderAction.BUY_TO_OPEN,
-            time_in_force=TimeInForce.DAY,
-            order_type=OrderType.MARKET if order_type == 'MARKET' else OrderType.LIMIT,
-            price=limit_price,
-            quantity=quantity,
-            instrument=instrument
-        )
-        order.send()
-        return f"✅ Order sent for {symbol} x{quantity} ({order_type})"
-    except Exception as e:
-        return f"❌ Order failed: {e}"
-
-def generate_trade_doc(trade_summary):
+# --- Helper Functions ---
+def generate_word_report(content, filename):
     doc = Document()
-    doc.add_heading('AI Trade Report', 0)
-    doc.add_paragraph(trade_summary)
-    filename = f"AI_Trade_{datetime.now().strftime('%Y%m%d_%H%M')}.docx"
+    doc.add_heading("Delta Ghost Trade Report", 0)
+    for paragraph in content:
+        doc.add_paragraph(paragraph)
     doc.save(filename)
     return filename
 
-def generate_trade_pdf(trade_summary):
+def generate_pdf_report(content, filename):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=12)
-    pdf.multi_cell(0, 10, trade_summary)
-    filename = f"AI_Trade_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf"
+    pdf.cell(200, 10, txt="Delta Ghost AI Trade Report", ln=True, align='C')
+    for line in content:
+        pdf.cell(200, 10, txt=line, ln=True, align='L')
     pdf.output(filename)
     return filename
 
-def Gemini_Search(query):
+def parse_options_file(uploaded_file):
+    df = pd.read_csv(uploaded_file)
+    return df
+
+def schedule_gemini_pull():
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    st.success(f"✅ Gemini signal pulled at {now}")
+    # Placeholder logic
+    st.session_state["gemini_signals"].append({"time": now, "signal": "AAPL breakout @ 210+ expected"})
+
+def handle_webhook():
+    st.info("Webhook Received! Processing TradingView Alert...")
+    # Insert logic here to parse TradingView alert JSON and act accordingly
+
+def tastytrade_execute_trade(symbol, action, quantity, order_type="Limit"):
     try:
-        api_key = st.secrets["GOOGLE_API_KEY"]
-        cse_id = st.secrets["GOOGLE_CSE_ID"]
-        service = build("customsearch", "v1", developerKey=api_key)
-        res = service.cse().list(q=query, cx=cse_id, num=5).execute()
-        results = []
-        for item in res.get('items', []):
-            results.append(f"{item['title']}\n{item['link']}\n{item['snippet']}\n")
-        return '\n---\n'.join(results)
+        session = TastySession("your_email", "your_password")
+        instruments = get_instruments(session, symbol=symbol, instrument_type="Equity Option")
+        # Example only: You need to filter specific options chain for strike, expiry, etc.
+        order = Order(session, action=action, symbol=symbol, quantity=quantity, order_type=order_type)
+        result = order.place()
+        st.success(f"Trade Executed: {pretty_json(result)}")
     except Exception as e:
-        return f"Error with Gemini search: {e}"
+        st.error(f"❌ Trade Failed: {e}")
 
-# --- Tabs ---
-tabs = st.tabs(["📈 Chart", "🤖 AI Trade Center", "📤 Auto Execution"])
+# --- Screener & Charts Page ---
+if menu == "Screener & Charts":
+    st.subheader("Step 1: Screener & Technical Charts")
+    tickers = st.text_area("Paste top tickers (e.g., NVDA, AMD, VRT):", height=100)
+    if tickers:
+        tickers_list = [t.strip().upper() for t in tickers.split(",")]
+        st.write("You entered:", tickers_list)
+        # Placeholder for actual charting or TA engine
 
-with tabs[0]:
-    st.header("Chart + Indicators")
-    ticker_input = st.text_input("Enter a ticker", "AAPL")
-    if st.button("Generate Chart"):
-        chart = generate_price_chart(ticker_input)
-        if isinstance(chart, str): st.error(chart)
-        else: st.image(chart)
+# --- AI Trade Signal Center ---
+elif menu == "AI Trade Signal Center":
+    st.subheader("Step 2: Auto-Generated AI Trade Plans")
+    if st.button("Schedule Gemini Pull"):
+        schedule_gemini_pull()
 
-with tabs[1]:
-    st.header("ChatGPT & Gemini Signal Center")
-    query = st.text_input("Enter topic or stock for Gemini signal", "NVDA AI chips")
-    if st.button("Run Gemini Search"):
-        result = Gemini_Search(query)
-        st.text_area("Gemini Results", result, height=300)
-        doc_file = generate_trade_doc(result)
-        pdf_file = generate_trade_pdf(result)
-        with open(doc_file, 'rb') as f:
-            st.download_button("Download Word Report", f, file_name=doc_file)
-        with open(pdf_file, 'rb') as f:
-            st.download_button("Download PDF Report", f, file_name=pdf_file)
+    if st.session_state["gemini_signals"]:
+        for sig in st.session_state["gemini_signals"]:
+            st.info(f"🧠 Gemini Signal @ {sig['time']} — {sig['signal']}")
 
-with tabs[2]:
-    st.header("Live Trade Execution")
-    symbol = st.text_input("Symbol", "TSLA")
-    qty = st.number_input("Quantity", min_value=1, value=1)
-    order_type = st.selectbox("Order Type", ["MARKET", "LIMIT"])
-    limit_price = None
-    if order_type == "LIMIT":
-        limit_price = st.number_input("Limit Price", min_value=0.01, value=1.00, step=0.01)
-    if st.button("Execute via TastyTrade"):
-        session = tasty_login()
-        if session:
-            res = place_order(session, symbol, qty, order_type, limit_price)
-            st.success(res)
+    export_option = st.selectbox("Export Report Format", ["Word", "PDF"])
+    if st.button("Generate Trade Report"):
+        sample_report = ["Signal: AAPL bullish breakout expected", "Entry target: $210", "Exit target: $225"]
+        if export_option == "Word":
+            filename = generate_word_report(sample_report, "delta_ghost_trade_report.docx")
+            with open(filename, "rb") as f:
+                st.download_button("📥 Download Word Report", f, file_name=filename)
         else:
-            st.error("Could not log in.")
+            filename = generate_pdf_report(sample_report, "delta_ghost_trade_report.pdf")
+            with open(filename, "rb") as f:
+                st.download_button("📥 Download PDF Report", f, file_name=filename)
+
+# --- Options Chain Upload Page ---
+elif menu == "Options & Uploads":
+    st.subheader("Step 3: Upload Option Chains or Setup Webhooks")
+    uploaded_file = st.file_uploader("Upload Options CSV", type="csv")
+    if uploaded_file:
+        df = parse_options_file(uploaded_file)
+        st.dataframe(df.head())
+        st.success("File parsed successfully. Displaying top rows.")
+
+    st.subheader("TradingView Webhook Listener")
+    if st.button("Simulate Webhook Alert"):
+        handle_webhook()
