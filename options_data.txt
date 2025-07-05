@@ -1,0 +1,1 @@
+TICKER: TSLADATA:- Bullish Flow: 15,000 Call contracts bought at the $200 strike.- Bearish Flow: 6,000 Put contracts bought at the $170 strike.---TICKER: NVDADATA:- Bullish Flow: 25,000 Call contracts bought at the $150 strike.- Bearish Flow: 5,000 Put contracts bought at the $130 strike.---

@@ -1,0 +1,23 @@
+# Core App & AI Framework
+streamlit
+langchain
+langchain-google-genai
+
+# Data Fetching & Web Scraping
+requests
+beautifulsoup4
+lxml
+pandas
+
+# Financial Data Libraries
+yfinance
+tradingview-ta
+
+
+# Charting & Visualization
+matplotlib
+
+# Google Web Search
+google-api-python-client
+google-auth-httplib2
+google-auth-oauthlib
