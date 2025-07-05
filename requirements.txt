@@ -12,3 +12,6 @@ scikit-learn
 beautifulsoup4
 lxml
 tqdm
+python-dotenv
+fastapi
+uvicorn
