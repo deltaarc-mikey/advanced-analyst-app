@@ -14,7 +14,7 @@ from langchain_core.tools import Tool
 from langchain_core.runnables import Runnable
 from langchain.agents import create_react_agent, AgentExecutor
 from langchain import hub
-from tastytrade import TastySession
+from tastytrade.session import TastySession
 from tastytrade.orders import EquityOrder, OrderAction, OrderType, TimeInForce
 from tastytrade.instruments import Equity
 from docx import Document
