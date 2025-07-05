@@ -1,115 +1,120 @@
-# 📊 Delta Ghost AI Trade Engine — Streamlit App
 import streamlit as st
 import yfinance as yf
 import pandas as pd
-import pandas_ta as ta
 import matplotlib.pyplot as plt
-import feedparser
-import requests
-import io
-import openai
 from streamlit_option_menu import option_menu
+import openai
+import requests
+import feedparser
 
-# ---------- SETUP ----------
-st.set_page_config(layout="wide", page_title="Delta Ghost AI Dashboard")
-st.title("📊 Delta Ghost AI Trade Engine")
-st.caption("Built with Gemini + ChatGPT + Unusual Whales Intelligence")
+# ---------------------
+# STREAMLIT LAYOUT
+# ---------------------
+st.set_page_config(layout="wide")
+with st.sidebar:
+    selected = option_menu(
+        menu_title="Delta Ghost AI Trade Engine",
+        options=["📊 Screener & Charts", "🤖 AI Trade Signal Center", "⚙️ Options & Uploads"],
+        icons=["bar-chart", "cpu", "cloud-upload"],
+        menu_icon="graph-up",
+        default_index=0,
+    )
 
-# ---------- OPTION MENU ----------
-selected = option_menu(
-    menu_title=None,
-    options=["📈 Screener & Charts", "🤖 AI Trade Signal Center", "📤 Options & Uploads"],
-    icons=["bar-chart", "robot", "cloud-upload"],
-    orientation="horizontal",
-)
+# ---------------------
+# CHARTING TAB
+# ---------------------
+if selected == "📊 Screener & Charts":
+    st.title("Step 1: Screener & Technical Charts")
 
-# ---------- FUNCTIONS ----------
-def load_price_chart(tickers):
-    tickers = [x.strip().upper() for x in tickers.split(',') if x.strip()]
-    if not tickers:
-        st.warning("Please enter at least one ticker.")
-        return
-
-    data = yf.download(tickers, period='6mo', progress=False)['Adj Close']
-    if isinstance(data, pd.Series):
-        data = data.to_frame(name=tickers[0])
-
-    fig, ax = plt.subplots(figsize=(14, 6))
-    for ticker in data.columns:
-        prices = data[ticker].dropna()
-        rsi = ta.rsi(prices)
-        sma = ta.sma(prices)
-        ax.plot(prices.index, prices, label=ticker)
-        ax.plot(rsi.index, rsi, linestyle='--', label=f"RSI - {ticker}")
-        ax.plot(sma.index, sma, linestyle=':', label=f"SMA - {ticker}")
-
-    ax.set_title("Price with RSI & SMA Overlays")
-    ax.legend()
-    st.pyplot(fig)
-
-# ---------- UOA UNUSUAL WHALES ----------
-def fetch_unusual_whales_flow(ticker):
-    api_key = st.secrets["UW_API_KEY"]
-    endpoint = f"https://phx.unusualwhales.com/api/historic_chains/{ticker.upper()}"
-    headers = {"Authorization": f"Bearer {api_key}"}
-    res = requests.get(endpoint, headers=headers)
-    if res.status_code == 200:
-        data = res.json()
-        df = pd.DataFrame(data)
-        st.dataframe(df.head(20))
-    else:
-        st.error("Failed to retrieve UOA data. Check API key or ticker.")
-
-# ---------- FINVIZ FEED ----------
-def load_finviz_rss():
-    url = "https://finviz.com/feed.ashx"
-    d = feedparser.parse(url)
-    if d.entries:
-        for entry in d.entries[:5]:
-            st.markdown(f"**[{entry.title}]({entry.link})**\n\n{entry.description}")
-    else:
-        st.write("No RSS entries found.")
-
-# ---------- LAYOUT: SCREENER & CHARTS ----------
-if selected == "📈 Screener & Charts":
-    st.subheader("Step 1: Screener & Technical Charts")
-    tickers = st.text_area("Paste top tickers:", "NVDA, AMD, VRT")
+    tickers_input = st.text_area("Paste top tickers:", "NVDA, AMD, VRT")
     if st.button("📊 Show Chart"):
-        load_price_chart(tickers)
+        tickers = [t.strip().upper() for t in tickers_input.split(",")]
+        data = yf.download(tickers, period='6mo')['Adj Close']
 
-    st.divider()
-    st.subheader("📉 Finviz Feed")
+        for ticker in tickers:
+            if ticker in data.columns:
+                df = pd.DataFrame(data[ticker])
+                df['SMA20'] = df[ticker].rolling(window=20).mean()
+                df['RSI'] = 100 - (100 / (1 + df[ticker].pct_change().rolling(14).mean() / df[ticker].pct_change().rolling(14).std()))
+
+                st.subheader(f"📈 {ticker} - Technical Chart")
+                fig, ax = plt.subplots(figsize=(12, 4))
+                df[ticker].plot(ax=ax, label='Price')
+                df['SMA20'].plot(ax=ax, label='SMA 20')
+                ax.set_ylabel("Price (USD)")
+                ax.legend()
+                st.pyplot(fig)
+
+                st.line_chart(df[['RSI']].dropna(), height=150, use_container_width=True)
+            else:
+                st.warning(f"No data for {ticker}.")
+
+    # --- Finviz RSS News ---
+    st.markdown("---")
+    st.header("📉 Finviz Feed")
     if st.button("Load Finviz RSS"):
-        load_finviz_rss()
+        rss_url = "https://finviz.com/feed.ashx"
+        feed = feedparser.parse(rss_url)
+        for entry in feed.entries[:5]:
+            st.markdown(f"**{entry.title}**  \n[{entry.link}]({entry.link})")
 
-    st.divider()
-    st.subheader("🛰️ Unusual Whales Flow")
-    ticker = st.text_input("Enter ticker for flow:", "VRT")
-    if st.button("📡 Get UOA"):
-        fetch_unusual_whales_flow(ticker)
+    # --- Unusual Whales Integration ---
+    st.markdown("---")
+    st.header("🛰️ Unusual Whales Flow")
+    uw_ticker = st.text_input("Enter ticker for flow:", "VRT")
+    if st.button("🐳 Get UOA"):
+        UW_API_KEY = st.secrets["UW_API_KEY"]
+        url = f"https://unusualwhales.com/api/historic_chains/{uw_ticker}?limit=5"
+        headers = {"Authorization": f"Bearer {UW_API_KEY}"}
+        r = requests.get(url, headers=headers)
+        if r.status_code == 200:
+            uw_data = r.json()
+            st.json(uw_data)
+        else:
+            st.error(f"Failed to retrieve UOA: {r.status_code}")
 
-# ---------- LAYOUT: AI TRADE SIGNAL CENTER ----------
+# ---------------------
+# AI TRADE SIGNAL CENTER
+# ---------------------
 elif selected == "🤖 AI Trade Signal Center":
+    st.title("🤖 AI Play Comparison: Gemini vs ChatGPT")
+    user_prompt = st.text_area("Enter a question or stock setup to analyze:", "Best options trade on NVDA this week?")
+
     col1, col2 = st.columns(2)
 
     with col1:
-        st.subheader("Gemini Analysis ✨")
-        st.write("Paste summary or context for Gemini below:")
-        gemini_input = st.text_area("Gemini Input", "Today’s top movers include TSLA and PLTR…")
-        if st.button("Analyze with Gemini"):
-            st.success("Gemini output placeholder...")
+        st.subheader("🧠 ChatGPT")
+        if st.button("Run ChatGPT"):
+            openai.api_key = st.secrets["OPENAI_API_KEY"]
+            response = openai.ChatCompletion.create(
+                model="gpt-4",
+                messages=[{"role": "user", "content": user_prompt}]
+            )
+            gpt_output = response['choices'][0]['message']['content']
+            st.write(gpt_output)
 
     with col2:
-        st.subheader("ChatGPT Analysis 🧠")
-        st.write("Paste summary or context for GPT below:")
-        gpt_input = st.text_area("GPT Input", "Show sentiment on TSLA vs PLTR")
-        if st.button("Analyze with ChatGPT"):
-            st.success("ChatGPT output placeholder...")
+        st.subheader("🔮 Gemini")
+        if st.button("Run Gemini"):
+            from langchain_google_genai import ChatGoogleGenerativeAI
+            llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=st.secrets["GOOGLE_API_KEY"])
+            output = llm.invoke(user_prompt)
+            st.write(output)
 
-# ---------- LAYOUT: OPTIONS + UPLOADS ----------
-elif selected == "📤 Options & Uploads":
-    st.subheader("Upload UOA CSVs or Custom Files")
-    uploaded_file = st.file_uploader("Choose CSV file to upload:", type="csv")
+# ---------------------
+# OPTIONS & UPLOAD TAB
+# ---------------------
+elif selected == "⚙️ Options & Uploads":
+    st.title("📂 Upload Analyst Files or UOA CSV")
+    uploaded_file = st.file_uploader("Upload CSV or document for review", type=["csv", "xlsx", "txt"])
     if uploaded_file is not None:
-        df = pd.read_csv(uploaded_file)
-        st.dataframe(df.head())
+        st.success("✅ File received!")
+        if uploaded_file.name.endswith(".csv"):
+            df = pd.read_csv(uploaded_file)
+            st.dataframe(df)
+        elif uploaded_file.name.endswith(".xlsx"):
+            df = pd.read_excel(uploaded_file)
+            st.dataframe(df)
+        else:
+            content = uploaded_file.read().decode("utf-8")
+            st.text(content)
