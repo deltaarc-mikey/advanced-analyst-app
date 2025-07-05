@@ -1,4 +1,4 @@
-streamlit
+ystreamlit
 yfinance
 pandas
 ta
@@ -12,3 +12,12 @@ fpdf
 feedparser
 langchain>=0.1.14
 tastytrade>=1.1.0
+streamlit
+yfinance
+matplotlib
+pandas
+google-api-python-client
+langchain
+langchain-google-genai
+praw
+pytrends
