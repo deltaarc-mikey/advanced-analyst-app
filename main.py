@@ -10,9 +10,6 @@ plt.switch_backend('agg')
 # --- Tool Definitions ---
 
 def generate_price_chart(tickers_string):
-    """
-    Generates a comparative stock price chart for a given list of tickers.
-    """
     tickers = [ticker.strip().upper() for ticker in tickers_string.split(',') if ticker.strip()]
     if not tickers: return "No tickers provided."
     raw_data = yf.download(tickers, period='1y', progress=False)
@@ -39,9 +36,6 @@ def generate_price_chart(tickers_string):
     return buf
 
 def Google Search_for_news(query):
-    """
-    Performs a Google search for the latest news on a given topic or company.
-    """
     try:
         api_key = st.secrets["GOOGLE_API_KEY"]
         cse_id = st.secrets["GOOGLE_CSE_ID"]
