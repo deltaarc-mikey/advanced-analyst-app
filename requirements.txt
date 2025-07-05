@@ -11,3 +11,4 @@ google-auth-httplib2
 google-auth-oauthlib
 langchain
 langchain-google-genai
+plotly
