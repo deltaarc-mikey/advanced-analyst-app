@@ -1,16 +1,12 @@
 streamlit
-pandas
-openai
 yfinance
-matplotlib
+pandas
 pandas-ta
-feedparser
-streamlit_option_menu
+matplotlib
 google-api-python-client
-google-auth-httplib2
-google-auth-oauthlib
 langchain
 langchain-google-genai
-plotly
+tastytrade
 python-docx
-pip install tastytrade
+fpdf
+feedparser
