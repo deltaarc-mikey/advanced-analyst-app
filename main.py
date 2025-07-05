@@ -49,7 +49,7 @@ def generate_price_chart(tickers_string):
     return buf
 
 
-def Google Search_for_news(query):
+def Google_Search_for_news(query):
     """
     Performs a Google search for the latest news on a given topic or company.
     """
