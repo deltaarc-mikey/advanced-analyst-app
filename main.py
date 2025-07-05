@@ -10,6 +10,22 @@ import yfinance as yf
 import openai
 import os
 from datetime import datetime
+import os
+import streamlit as st
+import praw
+
+# DEBUG: Show if secrets are loaded
+st.sidebar.subheader("🔑 Reddit API Debug")
+st.sidebar.write("Client ID:", os.getenv("REDDIT_CLIENT_ID"))
+st.sidebar.write("Client Secret:", os.getenv("REDDIT_CLIENT_SECRET"))
+st.sidebar.write("User Agent:", os.getenv("REDDIT_USER_AGENT"))
+
+# ✅ Reddit API connection
+reddit = praw.Reddit(
+    client_id=os.getenv("REDDIT_CLIENT_ID"),
+    client_secret=os.getenv("REDDIT_CLIENT_SECRET"),
+    user_agent=os.getenv("REDDIT_USER_AGENT")
+)
 
 # --- Sidebar ---
 st.set_page_config(layout="wide")
