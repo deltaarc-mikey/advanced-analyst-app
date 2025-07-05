@@ -2,27 +2,37 @@ import streamlit as st
 import yfinance as yf
 import matplotlib.pyplot as plt
 import io
+import pandas as pd
 
-# Set a non-interactive backend for Matplotlib to work with Streamlit
+# Set a non-interactive backend for Matplotlib
 plt.switch_backend('agg')
 
 def generate_price_chart(tickers_string):
     """
     Generates a comparative stock price chart for a given list of tickers.
-    The input should be a string of tickers separated by commas (e.g., 'AAPL,MSFT,GOOGL').
+    The input should be a string of tickers separated by commas.
     Returns the chart as an image in an in-memory buffer.
     """
-    # Parse the input string into a list of tickers
     tickers = [ticker.strip().upper() for ticker in tickers_string.split(',')]
     if not tickers:
         return None
 
-    # Download historical data for the last year
-    data = yf.download(tickers, period='1y')['Adj Close']
+    # Download historical data
+    raw_data = yf.download(tickers, period='1y')
+
+    # --- THIS IS THE FIX ---
+    # Select only the 'Adj Close' data, handling both single and multiple tickers
+    if isinstance(raw_data.columns, pd.MultiIndex):
+        # For multiple tickers, select the top-level 'Adj Close'
+        data_to_plot = raw_data['Adj Close']
+    else:
+        # For a single ticker, 'Adj Close' is a direct column
+        data_to_plot = raw_data[['Adj Close']]
+    # --- END OF FIX ---
 
     # Create a plot
     fig, ax = plt.subplots(figsize=(12, 7))
-    data.plot(ax=ax)
+    data_to_plot.plot(ax=ax)
 
     # Set chart titles and labels
     ax.set_title('Stock Price Comparison (Last Year)', fontsize=16)
@@ -36,14 +46,11 @@ def generate_price_chart(tickers_string):
     fig.savefig(buf, format='png')
     buf.seek(0)
 
-    # Close the plot figure to free up memory
     plt.close(fig)
 
     return buf
 
-
 # --- Streamlit User Interface ---
-
 st.set_page_config(layout="wide")
 st.title("📈 Advanced AI Analyst")
 st.write("This tool allows you to generate visual charts for stock analysis.")
