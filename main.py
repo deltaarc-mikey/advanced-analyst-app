@@ -8,12 +8,11 @@ from googleapiclient.discovery import build
 
 plt.switch_backend('agg')
 
-# --- Tool Definitions ---
+# --- Tool Functions ---
 
 def generate_price_chart(tickers_string):
     """
-    Generates a chart and returns a success message.
-    The chart image itself is stored in the session state for the UI to display.
+    Directly generates a chart and returns it as an image buffer. No AI involved.
     """
     tickers = [ticker.strip().upper() for ticker in tickers_string.split(',') if ticker.strip()]
     if not tickers: return "No tickers provided."
@@ -42,15 +41,12 @@ def generate_price_chart(tickers_string):
     fig.savefig(buf, format='png')
     buf.seek(0)
     plt.close(fig)
-    
-    # --- THIS IS THE CHANGE ---
-    # Store the image buffer in session state instead of returning it
-    st.session_state.last_chart = buf
-    # Return a simple success message to the agent
-    return f"Chart for {', '.join(price_data.columns)} was generated successfully."
-    # --- END OF CHANGE ---
+    return buf
 
-def Google_Search_for_news(query):
+def Google Search_for_news(query):
+    """
+    This function is now only used by the AI agent.
+    """
     try:
         api_key = st.secrets["GOOGLE_API_KEY"]
         cse_id = st.secrets["GOOGLE_CSE_ID"]
@@ -67,49 +63,60 @@ def Google_Search_for_news(query):
         else: return f"No search results found for '{query}'."
     except Exception as e: return f"An error occurred during the search: {e}"
 
-# --- Agent and UI Setup ---
+# --- Streamlit User Interface ---
 st.set_page_config(layout="wide")
 st.title("📈 Advanced AI Analyst")
-st.write("This AI can generate charts and search the web for the latest news.")
 
+# --- Section 1: Charting Tool (No AI) ---
+st.header("Comparative Price Chart")
+ticker_input = st.text_input("Enter stock tickers separated by commas:", "AAPL, MSFT, NVDA")
+
+if st.button("Generate Chart"):
+    if ticker_input:
+        with st.spinner("Generating chart..."):
+            result = generate_price_chart(ticker_input)
+            if isinstance(result, str):
+                st.error(result)
+            elif result:
+                st.image(result, caption=f"Price comparison for {ticker_input.upper()}")
+    else:
+        st.warning("Please enter at least one ticker symbol.")
+
+st.markdown("---") # Visual separator
+
+# --- Section 2: AI Research Assistant ---
+st.header("🤖 AI Research Assistant")
+
+# Initialize agent only once
 if 'agent_executor' not in st.session_state:
     from langchain_google_genai import ChatGoogleGenerativeAI
     from langchain.agents import Tool, AgentExecutor, create_react_agent
     from langchain import hub
     llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=st.secrets["GOOGLE_API_KEY"])
-    tools = [
-        Tool(name="generate_price_chart", func=generate_price_chart, description="Use to create a stock price comparison chart. Input is a string of tickers like 'AAPL,MSFT'."),
-        Tool(name="Google_Search_for_news", func=Google_Search_for_news, description="Use to search for recent news on a company or topic. Input is a search query string.")
-    ]
+    
+    # The agent now ONLY has the search tool
+    tools = [Tool(name="Google Search_for_news", func=Google Search_for_news, description="Use to search for recent news on a company or topic.")]
+    
     prompt = hub.pull("hwchase17/react")
     agent = create_react_agent(llm, tools, prompt)
     st.session_state.agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
 
-# --- UI Interaction ---
-st.header("Ask me anything:")
-user_question = st.text_input("Examples: 'Chart the price of TSLA,RIVN,LCID' or 'What is the latest news on Vertiv Holdings?'", "")
+# UI for the AI agent
+ai_question = st.text_input("Ask for news or recent developments:", "Latest news on AI infrastructure stocks")
 
-if user_question:
-    st.session_state.last_chart = None # Reset chart state on new question
-    with st.spinner("Thinking..."):
-        string_io = io.StringIO()
-        with contextlib.redirect_stdout(string_io):
-             response = st.session_state.agent_executor.invoke({"input": user_question})
-        thought_process = string_io.getvalue()
-        
-        output = response.get("output")
-        
-        # --- THIS IS THE CHANGE ---
-        st.markdown("### Final Answer:")
-        # Check if the chart tool stored an image in the session state
-        if st.session_state.last_chart:
-            st.image(st.session_state.last_chart)
-            # Optionally, display the success message the agent saw
+if st.button("Ask AI"):
+    if ai_question:
+        with st.spinner("AI is searching..."):
+            string_io = io.StringIO()
+            with contextlib.redirect_stdout(string_io):
+                 response = st.session_state.agent_executor.invoke({"input": ai_question})
+            thought_process = string_io.getvalue()
+            output = response.get("output")
+            
+            st.markdown("### AI Response:")
             st.write(output)
-        else:
-            # Otherwise, just display the text output from the agent
-            st.write(output)
-        # --- END OF CHANGE ---
 
-        with st.expander("Show Thought Process"):
-            st.text(thought_process)
+            with st.expander("Show Thought Process"):
+                st.text(thought_process)
+    else:
+        st.warning("Please enter a question for the AI.")
