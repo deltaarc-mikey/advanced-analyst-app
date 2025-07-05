@@ -9,45 +9,40 @@ plt.switch_backend('agg')
 def generate_price_chart(tickers_string):
     """
     Generates a comparative stock price chart for a given list of tickers.
-    This version includes robust error handling for yfinance data.
+    This final version includes a fallback to the 'Close' price.
     """
     tickers = [ticker.strip().upper() for ticker in tickers_string.split(',') if ticker.strip()]
     if not tickers:
         return "No tickers provided."
 
-    # Download historical data
     raw_data = yf.download(tickers, period='1y', progress=False)
 
-    # --- FINAL FIX WITH ERROR HANDLING ---
-    # 1. Check if the download returned any data at all.
     if raw_data.empty:
         return f"Could not find any data for the tickers: {', '.join(tickers)}."
 
-    # 2. Select the 'Adj Close' data. This is now the only data we care about.
+    # --- FINAL FIX: Fallback from 'Adj Close' to 'Close' ---
     if 'Adj Close' in raw_data.columns:
-        adj_close_data = raw_data['Adj Close']
+        price_data = raw_data['Adj Close']
+        price_label = 'Adjusted Close Price'
+    elif 'Close' in raw_data.columns:
+        price_data = raw_data['Close']
+        price_label = 'Close Price'
     else:
-        # If for some reason 'Adj Close' is not a column, we cannot proceed.
-        return "The downloaded data is not in the expected format (missing 'Adj Close')."
-
-    # 3. For single tickers, yfinance might not create a top-level 'Adj Close'.
-    # We handle this by checking if we have a simple Series or a DataFrame.
-    if isinstance(adj_close_data, pd.Series):
-         # Convert a single stock's data into a DataFrame for consistent plotting
-         adj_close_data = adj_close_data.to_frame(name=tickers[0])
-
-    # 4. Drop columns for any tickers that failed to download (all NaN values)
-    adj_close_data.dropna(axis=1, how='all', inplace=True)
-    if adj_close_data.empty:
-         return f"All tickers provided were invalid or had no data: {', '.join(tickers)}."
+        return "Could not find 'Adj Close' or 'Close' columns in the downloaded data."
     # --- END OF FIX ---
 
-    # Create a plot
+    if isinstance(price_data, pd.Series):
+         price_data = price_data.to_frame(name=tickers[0])
+
+    price_data.dropna(axis=1, how='all', inplace=True)
+    if price_data.empty:
+         return f"All tickers provided were invalid or had no data: {', '.join(tickers)}."
+
     fig, ax = plt.subplots(figsize=(12, 7))
-    adj_close_data.plot(ax=ax)
+    price_data.plot(ax=ax)
 
     ax.set_title('Stock Price Comparison (Last Year)', fontsize=16)
-    ax.set_ylabel('Adjusted Close Price (USD)', fontsize=12)
+    ax.set_ylabel(f'{price_label} (USD)', fontsize=12)
     ax.set_xlabel('Date', fontsize=12)
     ax.grid(True)
     ax.legend(title='Tickers')
@@ -70,7 +65,6 @@ if st.button("Generate Chart"):
     if ticker_input:
         with st.spinner("Generating chart..."):
             result = generate_price_chart(ticker_input)
-            # Check if the result is an image buffer or an error string
             if isinstance(result, str):
                 st.error(result)
             elif result:
