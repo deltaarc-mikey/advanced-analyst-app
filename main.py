@@ -14,7 +14,7 @@ tabs = st.tabs(["Screener & Charts", "AI Trade Signal Center", "Options & Upload
 # --- Tab 1: Screener & TradingView Alerts ---
 with tabs[0]:
     st.header("Step 1: Screener & Technical Charts")
-    tickers = st.text_area("Paste top tickers (e.g., NVDA, AMD, VRT):", height=50)
+    tickers = st.text_area("Paste top tickers (e.g., NVDA, AMD, VRT):", height=70)
     if st.button("Show Chart"):
         st.info(f"Tickers entered: {tickers}")
 
