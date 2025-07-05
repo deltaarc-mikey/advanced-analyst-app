@@ -7,13 +7,19 @@ from pytrends.request import TrendReq
 from docx import Document
 from datetime import datetime
 import openai
+import json
+import requests
+from fastapi import FastAPI, Request
+from threading import Thread
+from uvicorn import run as uvicorn_run
 
 # ========== CONFIGURATION ==========
-
 REDDIT_CLIENT_ID = "YOUR_REDDIT_CLIENT_ID"
 REDDIT_CLIENT_SECRET = "YOUR_REDDIT_CLIENT_SECRET"
 REDDIT_USER_AGENT = "delta-ghost-ai-sentiment"
 OPENAI_API_KEY = "YOUR_OPENAI_API_KEY"
+GEMINI_API_KEY = "YOUR_GEMINI_API_KEY"
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=" + GEMINI_API_KEY
 
 openai.api_key = OPENAI_API_KEY
 
@@ -70,7 +76,7 @@ def analyze_stock(ticker):
     else:
         return df, "Hold"
 
-def generate_llm_summary(ticker, signal, rsi, sentiment, trend):
+def generate_openai_summary(ticker, signal, rsi, sentiment, trend):
     prompt = f"""
     Provide a concise, professional summary for a stock trading signal:
     Ticker: {ticker}
@@ -87,42 +93,76 @@ def generate_llm_summary(ticker, signal, rsi, sentiment, trend):
     )
     return response.choices[0].message.content.strip()
 
+def generate_gemini_summary(ticker, signal, rsi, sentiment, trend):
+    prompt = f"""
+    Provide a concise, professional summary for a stock trading signal:
+    Ticker: {ticker}
+    Signal: {signal}
+    RSI: {rsi}
+    Reddit Sentiment: {sentiment}
+    Google Trends Score: {trend}
+    Summary should be clear and actionable.
+    """
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}]
+    }
+    headers = {"Content-Type": "application/json"}
+    response = requests.post(GEMINI_URL, headers=headers, data=json.dumps(payload))
+    return response.json()['candidates'][0]['content']['parts'][0]['text']
+
 # ========== STREAMLIT UI ==========
+st.set_page_config(page_title="Delta Ghost AI+Gemini Analyst", layout="centered")
+st.title("📈 Delta Ghost Trade Report – Gemini & GPT-4")
 
-st.set_page_config(page_title="Delta Ghost LLM Analyst", layout="centered")
-st.title("📈 Delta Ghost AI Trade Report")
-
-ticker = st.text_input("Enter Ticker Symbol (e.g., TSLA)", "AAPL")
+ticker = st.text_input("Enter Ticker Symbol", "AAPL")
 
 if st.button("Run Full Analysis"):
-    with st.spinner("Analyzing trade setup..."):
+    with st.spinner("Analyzing..."):
         df, signal = analyze_stock(ticker)
         rsi = df['RSI'].iloc[-1]
         trend_score = google_trend_score(ticker)
         sentiment = reddit_sentiment(ticker)
 
-        st.subheader("📊 Technical Indicators")
-        st.line_chart(df[['Close', 'EMA']])
-        st.write(f"**Latest RSI:** {rsi:.2f}")
-        st.write(f"**Signal:** {signal}")
+        gpt_summary = generate_openai_summary(ticker, signal, rsi, sentiment, trend_score)
+        gemini_summary = generate_gemini_summary(ticker, signal, rsi, sentiment, trend_score)
 
-        st.subheader("📢 Sentiment Snapshot")
-        st.write(f"**Reddit:** {sentiment}")
-        st.write(f"**Google Trends Score:** {trend_score}")
+        st.subheader("📊 Indicators")
+        st.line_chart(df[['Close', 'EMA']])
+        st.write(f"**RSI:** {rsi:.2f} | **Signal:** {signal}")
+
+        st.subheader("📢 Reddit & Trends")
+        st.write(sentiment)
+        st.write(f"Google Trends Score: {trend_score}")
 
         st.subheader("🧠 GPT-4 Summary")
-        summary = generate_llm_summary(ticker, signal, rsi, sentiment, trend_score)
-        st.info(summary)
+        st.info(gpt_summary)
+
+        st.subheader("🧠 Gemini Summary")
+        st.success(gemini_summary)
 
         doc = Document()
-        doc.add_heading(f"{ticker} – AI Trade Report", 0)
-        doc.add_paragraph(f"Signal: {signal}")
-        doc.add_paragraph(f"RSI: {rsi:.2f}")
-        doc.add_paragraph(f"Reddit Sentiment: {sentiment}")
-        doc.add_paragraph(f"Google Trends Score: {trend_score}")
-        doc.add_paragraph(f"\nLLM Summary:\n{summary}")
-        filename = f"{ticker}_trade_report.docx"
+        doc.add_heading(f"{ticker} – Trade Report", 0)
+        doc.add_paragraph(f"Signal: {signal}\nRSI: {rsi:.2f}")
+        doc.add_paragraph(f"Reddit Sentiment: {sentiment}\nGoogle Trends Score: {trend_score}")
+        doc.add_paragraph("\nGPT-4 Summary:\n" + gpt_summary)
+        doc.add_paragraph("\nGemini Summary:\n" + gemini_summary)
+        filename = f"{ticker}_report.docx"
         doc.save(filename)
 
         with open(filename, "rb") as f:
-            st.download_button("📄 Download Word Report", f, file_name=filename)
+            st.download_button("📄 Download Report", f, file_name=filename)
+
+# ========== FASTAPI WEBHOOK FOR TRADINGVIEW ==========
+app = FastAPI()
+
+@app.post("/webhook")
+async def tradingview_webhook(request: Request):
+    data = await request.json()
+    ticker = data.get("ticker")
+    if ticker:
+        df, signal = analyze_stock(ticker)
+        print(f"Received alert for {ticker}: {signal}")
+        # Future: integrate email, Twilio, order execution
+    return {"status": "received"}
+
+Thread(target=uvicorn_run, args=(app,), kwargs={"host": "0.0.0.0", "port": 8000}, daemon=True).start()
