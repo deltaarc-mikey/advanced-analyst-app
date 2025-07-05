@@ -3,7 +3,7 @@ import yfinance as yf
 import matplotlib.pyplot as plt
 import io
 import pandas as pd
-import contextlib  # Missing import
+import contextlib
 from googleapiclient.discovery import build
 
 plt.switch_backend('agg')
@@ -11,18 +11,25 @@ plt.switch_backend('agg')
 # --- Tool Definitions ---
 
 def generate_price_chart(tickers_string):
+    """
+    Generates a chart and returns a success message.
+    The chart image itself is stored in the session state for the UI to display.
+    """
     tickers = [ticker.strip().upper() for ticker in tickers_string.split(',') if ticker.strip()]
     if not tickers: return "No tickers provided."
     raw_data = yf.download(tickers, period='1y', progress=False)
     if raw_data.empty: return f"Could not find any data for the tickers: {', '.join(tickers)}."
+    
     if 'Adj Close' in raw_data.columns:
         price_data, price_label = raw_data['Adj Close'], 'Adjusted Close Price'
     elif 'Close' in raw_data.columns:
         price_data, price_label = raw_data['Close'], 'Close Price'
     else: return "Could not find 'Adj Close' or 'Close' columns."
+
     if isinstance(price_data, pd.Series): price_data = price_data.to_frame(name=tickers[0])
     price_data.dropna(axis=1, how='all', inplace=True)
     if price_data.empty: return f"All tickers provided were invalid or had no data: {', '.join(tickers)}."
+
     fig, ax = plt.subplots(figsize=(12, 7))
     price_data.plot(ax=ax)
     ax.set_title('Stock Price Comparison (Last Year)', fontsize=16)
@@ -30,11 +37,18 @@ def generate_price_chart(tickers_string):
     ax.set_xlabel('Date', fontsize=12)
     ax.grid(True)
     ax.legend(title='Tickers')
+    
     buf = io.BytesIO()
     fig.savefig(buf, format='png')
     buf.seek(0)
     plt.close(fig)
-    return buf
+    
+    # --- THIS IS THE CHANGE ---
+    # Store the image buffer in session state instead of returning it
+    st.session_state.last_chart = buf
+    # Return a simple success message to the agent
+    return f"Chart for {', '.join(price_data.columns)} was generated successfully."
+    # --- END OF CHANGE ---
 
 def Google_Search_for_news(query):
     try:
@@ -50,10 +64,8 @@ def Google_Search_for_news(query):
                 snippet = item.get('snippet', 'No snippet available.').replace('\n', '')
                 formatted_results.append(f"Title: {title}\nLink: {link}\nSnippet: {snippet}\n---")
             return "\n".join(formatted_results)
-        else:
-            return f"No search results found for '{query}'."
-    except Exception as e:
-        return f"An error occurred during the search: {e}"
+        else: return f"No search results found for '{query}'."
+    except Exception as e: return f"An error occurred during the search: {e}"
 
 # --- Agent and UI Setup ---
 st.set_page_config(layout="wide")
@@ -78,19 +90,26 @@ st.header("Ask me anything:")
 user_question = st.text_input("Examples: 'Chart the price of TSLA,RIVN,LCID' or 'What is the latest news on Vertiv Holdings?'", "")
 
 if user_question:
+    st.session_state.last_chart = None # Reset chart state on new question
     with st.spinner("Thinking..."):
         string_io = io.StringIO()
         with contextlib.redirect_stdout(string_io):
              response = st.session_state.agent_executor.invoke({"input": user_question})
         thought_process = string_io.getvalue()
-
+        
         output = response.get("output")
-
+        
+        # --- THIS IS THE CHANGE ---
         st.markdown("### Final Answer:")
-        if isinstance(output, io.BytesIO):
-            st.image(output)
-        else:
+        # Check if the chart tool stored an image in the session state
+        if st.session_state.last_chart:
+            st.image(st.session_state.last_chart)
+            # Optionally, display the success message the agent saw
             st.write(output)
+        else:
+            # Otherwise, just display the text output from the agent
+            st.write(output)
+        # --- END OF CHANGE ---
 
         with st.expander("Show Thought Process"):
             st.text(thought_process)
