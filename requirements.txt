@@ -1,12 +1,10 @@
 streamlit
-langchain
-langchain-google-genai
-requests
-google-api-python-client
-google-auth-httplib2
-google-auth-oauthlib
-pandas
 yfinance
+pandas
+pandas-ta
 matplotlib
 feedparser
 openai
+google-api-python-client
+requests
+streamlit-option-menu
