@@ -1,24 +1,12 @@
-# Core App & AI Framework
 streamlit
 langchain
 langchain-google-genai
-
-# Web & Data Handling
 requests
 beautifulsoup4
 lxml
-
-# Specific Financial Data Libraries
+pandas
 yfinance
 tradingview-ta
-
-# Data, Analysis & Dependencies (with specific versions)
-pandas==2.2.2
-numpy==1.26.4
-pandas-ta==0.3.14b
-setuptools
-
-# Google Search
 google-api-python-client
 google-auth-httplib2
 google-auth-oauthlib
