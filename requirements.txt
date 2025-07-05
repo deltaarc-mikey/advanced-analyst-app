@@ -12,5 +12,3 @@ fpdf
 feedparser
 langchain>=0.1.14
 tastytrade>=1.1.0
-pandas_ta
-setuptools>=65.5.0
