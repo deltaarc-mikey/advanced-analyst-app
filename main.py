@@ -89,7 +89,7 @@ if 'agent_executor' not in st.session_state:
     # We add our new Google Search_for_news tool to this list
     tools = [
         Tool(name="generate_price_chart", func=generate_price_chart, description="Use to create a stock price comparison chart. Input is a string of tickers like 'AAPL,MSFT'."),
-        Tool(name="Google Search_for_news", func=Google Search_for_news, description="Use to search for recent news on a company or topic. Input is a search query string.")
+        Tool(name="Google_Search_for_news", func=Google Search_for_news, description="Use to search for recent news on a company or topic. Input is a search query string.")
     ]
     
     prompt = hub.pull("hwchase17/react")
