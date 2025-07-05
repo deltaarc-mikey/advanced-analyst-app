@@ -10,9 +10,6 @@ import yfinance as yf
 import openai
 import os
 from datetime import datetime
-import os
-import streamlit as st
-import praw
 
 # DEBUG: Show if secrets are loaded
 st.sidebar.subheader("🔑 Reddit API Debug")
@@ -33,11 +30,6 @@ st.sidebar.title("📊 Delta Ghost AI Trading Panel")
 selected_tab = st.sidebar.radio("Navigate", ["Enter Ticker", "Reddit + Trends", "AI Trade Signal Center"])
 
 # --- Reddit + Google Trends Config ---
-reddit = praw.Reddit(
-    client_id=os.getenv("reddit_client_id"),
-    client_secret=os.getenv("reddit_client_secret"),
-    user_agent=os.getenv("reddit_user_agent")
-)
 pytrends = TrendReq(hl='en-US', tz=360)
 
 # --- OpenAI and Gemini Config ---
