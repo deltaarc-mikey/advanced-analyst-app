@@ -1,6 +1,4 @@
 # 📊 Delta Ghost AI Trade Engine — Streamlit App
-
-```python
 import streamlit as st
 import yfinance as yf
 import pandas as pd
