@@ -3,6 +3,7 @@ import yfinance as yf
 import matplotlib.pyplot as plt
 import io
 import pandas as pd
+from googleapiclient.discovery import build
 
 plt.switch_backend('agg')
 
@@ -47,21 +48,75 @@ def generate_price_chart(tickers_string):
     plt.close(fig)
     return buf
 
+
+def Google Search_for_news(query):
+    """
+    Performs a Google search for the latest news on a given topic or company.
+    """
+    try:
+        api_key = st.secrets["GOOGLE_API_KEY"]
+        cse_id = st.secrets["GOOGLE_CSE_ID"]
+        service = build("customsearch", "v1", developerKey=api_key)
+        res = service.cse().list(q=query, cx=cse_id, num=5).execute()
+        if 'items' in res:
+            formatted_results = []
+            for item in res['items']:
+                title = item.get('title', 'No Title')
+                link = item.get('link', '#')
+                snippet = item.get('snippet', 'No snippet available.').replace('\n', '')
+                formatted_results.append(f"Title: {title}\nLink: {link}\nSnippet: {snippet}\n---")
+            return "\n".join(formatted_results)
+        else:
+            return f"No search results found for '{query}'."
+    except Exception as e:
+        return f"An error occurred during the search: {e}"
+
+
+
+
 # --- Streamlit User Interface ---
+# --- Agent and UI Setup ---
 st.set_page_config(layout="wide")
 st.title("📈 Advanced AI Analyst")
-st.write("This tool allows you to generate visual charts for stock analysis.")
+st.write("This AI can generate charts and search the web for the latest news.")
 
-st.header("Comparative Price Chart")
-ticker_input = st.text_input("Enter stock tickers separated by commas:", "AAPL, MSFT, NVDA")
+if 'agent_executor' not in st.session_state:
+    from langchain_google_genai import ChatGoogleGenerativeAI
+    from langchain.agents import Tool, AgentExecutor, create_react_agent
+    from langchain import hub
+    llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=st.secrets["GOOGLE_API_KEY"])
+    
+    # We add our new Google Search_for_news tool to this list
+    tools = [
+        Tool(name="generate_price_chart", func=generate_price_chart, description="Use to create a stock price comparison chart. Input is a string of tickers like 'AAPL,MSFT'."),
+        Tool(name="Google Search_for_news", func=Google Search_for_news, description="Use to search for recent news on a company or topic. Input is a search query string.")
+    ]
+    
+    prompt = hub.pull("hwchase17/react")
+    agent = create_react_agent(llm, tools, prompt)
+    st.session_state.agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
 
-if st.button("Generate Chart"):
-    if ticker_input:
-        with st.spinner("Generating chart..."):
-            result = generate_price_chart(ticker_input)
-            if isinstance(result, str):
-                st.error(result)
-            elif result:
-                st.image(result, caption=f"Price comparison for {ticker_input.upper()}")
-    else:
-        st.warning("Please enter at least one ticker symbol.")
+# --- UI Interaction ---
+st.header("Ask me anything:")
+user_question = st.text_input("Examples: 'Chart the price of TSLA,RIVN,LCID' or 'What is the latest news on Vertiv Holdings?'", "")
+
+if user_question:
+    with st.spinner("Thinking..."):
+        # The invoke call now needs to be wrapped to capture the verbose output for the UI
+        string_io = io.StringIO()
+        with contextlib.redirect_stdout(string_io):
+             response = st.session_state.agent_executor.invoke({"input": user_question})
+        thought_process = string_io.getvalue()
+        
+        output = response.get("output")
+        
+        # Display the final answer
+        st.markdown("### Final Answer:")
+        if isinstance(output, io.BytesIO):
+            st.image(output)
+        else:
+            st.write(output)
+
+        # Display the thought process in an expander
+        with st.expander("Show Thought Process"):
+            st.text(thought_process)
