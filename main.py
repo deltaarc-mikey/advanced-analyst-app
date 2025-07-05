@@ -63,7 +63,7 @@ def analyze_stock(ticker):
     summary_data += f"52w High: {info.get('fiftyTwoWeekHigh', 'N/A')}\n"
     summary_data += f"52w Low: {info.get('fiftyTwoWeekLow', 'N/A')}\n"
 
-        if news:
+    if news:
         for item in news[:3]:
             title = item.get('title') or item.get('headline') or 'No Title'
             summary = item.get('summary', 'No Summary Available')
