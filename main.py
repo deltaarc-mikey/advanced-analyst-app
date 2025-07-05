@@ -63,10 +63,13 @@ def analyze_stock(ticker):
     summary_data += f"52w High: {info.get('fiftyTwoWeekHigh', 'N/A')}\n"
     summary_data += f"52w Low: {info.get('fiftyTwoWeekLow', 'N/A')}\n"
 
-    if news:
+        if news:
         for item in news[:3]:
-            summary_data += f"\nHeadline: {item['title']}\nSummary: {item.get('summary', '')}\n"
-
+            title = item.get('title') or item.get('headline') or 'No Title'
+            summary = item.get('summary', 'No Summary Available')
+            summary_data += f"\nHeadline: {title}\nSummary: {summary}\n"
+    else:
+        summary_data += "\nNo news available from Yahoo Finance.\n"
     reddit_mentions, reddit_sentiment = fetch_reddit_sentiment(ticker)
     google_trend = fetch_google_trends(ticker)
 
