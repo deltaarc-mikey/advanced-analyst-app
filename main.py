@@ -78,7 +78,16 @@ if selected_tab == "Enter Ticker":
             response = requests.get(uw_url, headers=headers)
             if response.status_code == 200:
                 chains = response.json()
+            if isinstance(chains, list) and isinstance(chains[0], dict):
                 filtered = [c for c in chains if c.get("ask", 999) < 2 and c.get("volume", 0) > 500]
+            if filtered:
+                df = pd.DataFrame(filtered)
+                st.dataframe(df[["contract_symbol", "type", "strike", "expiration", "ask", "volume"]])
+                else:
+                    st.info("No matching options under current filter.")
+            else:
+                st.error(f"Unexpected response format: {chains}")
+                    
                 if filtered:
                     df = pd.DataFrame(filtered)
                     st.dataframe(df[["contract_symbol", "type", "strike", "expiration", "ask", "volume"]])
@@ -99,8 +108,8 @@ elif selected_tab == "Reddit + Trends":
     keyword = st.text_input("Enter a search keyword:", value="options")
     if keyword:
         # Reddit scrape
-        subreddit = reddit.subreddit("options")
-        titles = [post.title for post in subreddit.hot(limit=25)]
+        subreddit = reddit.subreddit("all")
+        titles = [post.title for post in subreddit.search(keyword, limit=25)]
         st.write("### Reddit Mentions")
         for title in titles:
             st.markdown(f"- {title}")
