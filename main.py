@@ -3,56 +3,40 @@ import yfinance as yf
 import matplotlib.pyplot as plt
 import io
 import pandas as pd
+import contextlib  # Missing import
 from googleapiclient.discovery import build
 
 plt.switch_backend('agg')
 
+# --- Tool Definitions ---
+
 def generate_price_chart(tickers_string):
     tickers = [ticker.strip().upper() for ticker in tickers_string.split(',') if ticker.strip()]
-    if not tickers:
-        return "No tickers provided."
-
+    if not tickers: return "No tickers provided."
     raw_data = yf.download(tickers, period='1y', progress=False)
-
-    if raw_data.empty:
-        return f"Could not find any data for the tickers: {', '.join(tickers)}."
-
+    if raw_data.empty: return f"Could not find any data for the tickers: {', '.join(tickers)}."
     if 'Adj Close' in raw_data.columns:
-        price_data = raw_data['Adj Close']
-        price_label = 'Adjusted Close Price'
+        price_data, price_label = raw_data['Adj Close'], 'Adjusted Close Price'
     elif 'Close' in raw_data.columns:
-        price_data = raw_data['Close']
-        price_label = 'Close Price'
-    else:
-        return "Could not find 'Adj Close' or 'Close' columns in the downloaded data."
-
-    if isinstance(price_data, pd.Series):
-         price_data = price_data.to_frame(name=tickers[0])
-
+        price_data, price_label = raw_data['Close'], 'Close Price'
+    else: return "Could not find 'Adj Close' or 'Close' columns."
+    if isinstance(price_data, pd.Series): price_data = price_data.to_frame(name=tickers[0])
     price_data.dropna(axis=1, how='all', inplace=True)
-    if price_data.empty:
-         return f"All tickers provided were invalid or had no data: {', '.join(tickers)}."
-
+    if price_data.empty: return f"All tickers provided were invalid or had no data: {', '.join(tickers)}."
     fig, ax = plt.subplots(figsize=(12, 7))
     price_data.plot(ax=ax)
-
     ax.set_title('Stock Price Comparison (Last Year)', fontsize=16)
     ax.set_ylabel(f'{price_label} (USD)', fontsize=12)
     ax.set_xlabel('Date', fontsize=12)
     ax.grid(True)
     ax.legend(title='Tickers')
-
     buf = io.BytesIO()
     fig.savefig(buf, format='png')
     buf.seek(0)
     plt.close(fig)
     return buf
 
-
 def Google_Search_for_news(query):
-    """
-    Performs a Google search for the latest news on a given topic or company.
-    """
     try:
         api_key = st.secrets["GOOGLE_API_KEY"]
         cse_id = st.secrets["GOOGLE_CSE_ID"]
@@ -71,10 +55,6 @@ def Google_Search_for_news(query):
     except Exception as e:
         return f"An error occurred during the search: {e}"
 
-
-
-
-# --- Streamlit User Interface ---
 # --- Agent and UI Setup ---
 st.set_page_config(layout="wide")
 st.title("📈 Advanced AI Analyst")
@@ -85,13 +65,10 @@ if 'agent_executor' not in st.session_state:
     from langchain.agents import Tool, AgentExecutor, create_react_agent
     from langchain import hub
     llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=st.secrets["GOOGLE_API_KEY"])
-    
-    # We add our new Google Search_for_news tool to this list
     tools = [
         Tool(name="generate_price_chart", func=generate_price_chart, description="Use to create a stock price comparison chart. Input is a string of tickers like 'AAPL,MSFT'."),
         Tool(name="Google_Search_for_news", func=Google_Search_for_news, description="Use to search for recent news on a company or topic. Input is a search query string.")
     ]
-    
     prompt = hub.pull("hwchase17/react")
     agent = create_react_agent(llm, tools, prompt)
     st.session_state.agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
@@ -102,21 +79,18 @@ user_question = st.text_input("Examples: 'Chart the price of TSLA,RIVN,LCID' or 
 
 if user_question:
     with st.spinner("Thinking..."):
-        # The invoke call now needs to be wrapped to capture the verbose output for the UI
         string_io = io.StringIO()
         with contextlib.redirect_stdout(string_io):
              response = st.session_state.agent_executor.invoke({"input": user_question})
         thought_process = string_io.getvalue()
-        
+
         output = response.get("output")
-        
-        # Display the final answer
+
         st.markdown("### Final Answer:")
         if isinstance(output, io.BytesIO):
             st.image(output)
         else:
             st.write(output)
 
-        # Display the thought process in an expander
         with st.expander("Show Thought Process"):
             st.text(thought_process)
