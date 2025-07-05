@@ -1,13 +1,13 @@
 streamlit
+pandas
+openai
 yfinance
 matplotlib
-pandas
-requests
+pandas-ta
 feedparser
-openai
+streamlit_option_menu
 google-api-python-client
 google-auth-httplib2
 google-auth-oauthlib
 langchain
 langchain-google-genai
-streamlit-option-menu
