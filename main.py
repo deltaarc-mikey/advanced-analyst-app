@@ -48,7 +48,7 @@ def Google_Search_for_news(query):
     except Exception as e: return f"An error occurred during the search: {e}"
 
 def generate_technical_heatmap(tickers_string):
-    """Generates a heatmap using a simpler, more robust method."""
+    """Generates a heatmap of key technical indicators."""
     try:
         tickers = [ticker.strip().upper() for ticker in tickers_string.split(',') if ticker.strip()]
         if not tickers: return "No tickers provided."
@@ -63,33 +63,35 @@ def generate_technical_heatmap(tickers_string):
             latest = data.dropna().iloc[-1]; last_two_sma20 = data['SMA20'].dropna().iloc[-2:]
             if len(last_two_sma20) == 2:
                 results.append({
-                    'Ticker': ticker, 'RSI': f"{latest['RSI']:.1f}",
+                    'Ticker': ticker,
+                    'RSI': latest['RSI'], # Store the raw number
                     'Above_SMA50': 'Yes' if latest['Close'] > latest['SMA50'] else 'No',
                     'SMA20_Slope': 'Up' if last_two_sma20.iloc[1] > last_two_sma20.iloc[0] else 'Down'
                 })
         if not results: return "Could not generate heatmap for any of the given tickers."
         indicator_df = pd.DataFrame(results).set_index('Ticker')
 
-        # --- Simpler and Corrected Plotting Logic ---
+        # --- CORRECTED PLOTTING LOGIC ---
+        # Create a separate DataFrame for display text, formatting RSI to one decimal place
+        display_df = indicator_df.copy()
+        display_df['RSI'] = display_df['RSI'].astype(float).map('{:.1f}'.format)
+
         fig, ax = plt.subplots(figsize=(8, len(indicator_df) * 0.5)); ax.axis('tight'); ax.axis('off')
-        table = ax.table(cellText=indicator_df.values, colLabels=indicator_df.columns, rowLabels=indicator_df.index, loc='center', cellLoc='center')
+        table = ax.table(cellText=display_df.values, colLabels=indicator_df.columns, rowLabels=indicator_df.index, loc='center', cellLoc='center')
 
         # Loop through cells to set colors individually
         for i in range(len(indicator_df)):
-            # RSI Column (0)
             rsi_val = float(indicator_df.values[i, 0])
-            if rsi_val > 70: color = 'mistyrose' # Overbought
-            elif rsi_val < 30: color = 'lightgreen' # Oversold
-            else: color = 'white'
-            table[i+1, 0].set_facecolor(color)
+            if rsi_val > 70: rsi_color = 'mistyrose'
+            elif rsi_val < 30: rsi_color = 'lightgreen'
+            else: rsi_color = 'white'
+            table[i+1, 0].set_facecolor(rsi_color)
 
-            # Above_SMA50 Column (1)
-            color = 'lightgreen' if indicator_df.values[i, 1] == 'Yes' else 'mistyrose'
-            table[i+1, 1].set_facecolor(color)
+            sma50_color = 'lightgreen' if indicator_df.values[i, 1] == 'Yes' else 'mistyrose'
+            table[i+1, 1].set_facecolor(sma50_color)
 
-            # SMA20_Slope Column (2)
-            color = 'lightgreen' if indicator_df.values[i, 2] == 'Up' else 'mistyrose'
-            table[i+1, 2].set_facecolor(color)
+            slope_color = 'lightgreen' if indicator_df.values[i, 2] == 'Up' else 'mistyrose'
+            table[i+1, 2].set_facecolor(slope_color)
 
         table.auto_set_font_size(False); table.set_fontsize(10); table.scale(1.2, 1.8)
         buf = io.BytesIO(); plt.savefig(buf, format='png', bbox_inches='tight', pad_inches=0.1)
@@ -121,8 +123,7 @@ st.markdown("---")
 st.header("🤖 AI Research Assistant")
 if 'agent_executor' not in st.session_state:
     from langchain_google_genai import ChatGoogleGenerativeAI
-    from langchain.agents import Tool, AgentExecutor, create_react_agent
-    from langchain import hub
+    from langchain.agents import Tool, AgentExecutor, create_react_agent, hub
     llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=st.secrets["GOOGLE_API_KEY"])
     tools = [Tool(name="Google_Search_for_news", func=Google_Search_for_news, description="Use to search for recent news on a company or topic.")]
     prompt = hub.pull("hwchase17/react")
