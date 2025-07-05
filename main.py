@@ -24,10 +24,10 @@ if ticker:
     if response.status_code == 200:
         chains = response.json().get("chains", [])
 
-        # Filter: Ask < $0.50 and Volume > 1000
+        # Filter: Ask < $2 and Volume > 1000
         filtered = [
             c for c in chains
-            if c.get("ask", 999) < 0.5 and c.get("volume", 0) > 1000
+            if c.get("ask", 999) < 2 and c.get("volume", 0) > 1000
         ]
 
         if filtered:
@@ -42,6 +42,6 @@ if ticker:
                     "Volume": contract.get("volume"),
                 })
         else:
-            st.warning("⚠️ No contracts matched the criteria (ask < $0.50, volume > 1000).")
+            st.warning("⚠️ No contracts matched the criteria (ask < $2, volume > 1000).")
     else:
         st.error(f"❌ API Error {response.status_code}: {response.text}")
