@@ -8,3 +8,4 @@ praw
 pytrends
 python-docx
 openai
+yfinance
