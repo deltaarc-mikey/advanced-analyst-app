@@ -10,7 +10,10 @@ import feedparser
 import requests
 from googleapiclient.discovery import build
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.agents import Tool, AgentExecutor, create_react_agent, hub
+from langchain_core.tools import Tool
+from langchain_core.runnables import Runnable
+from langchain.agents import create_react_agent, AgentExecutor
+from langchain import hub
 from tastytrade import TastySession
 from tastytrade.orders import EquityOrder, OrderAction, OrderType, TimeInForce
 from tastytrade.instruments import Equity
