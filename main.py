@@ -1,64 +1,50 @@
 import streamlit as st
 import openai
 import google.generativeai as genai
-import os
 from dotenv import load_dotenv
+import os
 
 # Load environment variables
 load_dotenv()
-
-# Get API keys
 openai.api_key = os.getenv("OPENAI_API_KEY")
-genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
-# Set page config
-st.set_page_config(page_title="📈 Delta Ghost AI: Smart Trade Reports")
+# UI Title
 st.title("📈 Delta Ghost AI: Smart Trade Reports")
-
-# Ticker Input
-ticker = st.text_input("Enter a ticker (e.g., TSLA, AAPL):", max_chars=10)
-
-# Prompt template
-prompt_template = """
-{ticker} is a publicly traded company. Provide analysis including stock overview, risk, opportunity, and sentiment.
-"""
-
-# Output containers
-chatgpt_col, gemini_col = st.columns(2)
+ticker = st.text_input("Enter a ticker (e.g., TSLA, AAPL):")
 
 if ticker:
-    prompt = prompt_template.format(ticker=ticker.upper())
+    raw_prompt = f"""{ticker.upper()} is a publicly traded company. Provide analysis including stock overview, risk, opportunity, and sentiment.
+Also include Reddit sentiment if available and any recent spikes in Google Trends. """
 
-    # ChatGPT Summary
-    with chatgpt_col:
-        st.subheader("🧠 ChatGPT Summary")
-        try:
-            chatgpt_response = openai.ChatCompletion.create(
-                model="gpt-4",
-                messages=[
-                    {"role": "system", "content": "You are a professional stock analyst."},
-                    {"role": "user", "content": prompt}
-                ]
-            )
-            st.success("✅ ChatGPT Responded")
-            st.markdown(chatgpt_response.choices[0].message.content)
-        except Exception as e:
-            st.error(f"❌ ChatGPT Error:\n\n{str(e)}")
+    st.markdown("## 🧠 ChatGPT Summary")
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[
+                {"role": "system", "content": "You are a professional financial analyst."},
+                {"role": "user", "content": raw_prompt}
+            ],
+            temperature=0.5,
+            max_tokens=500
+        )
+        gpt_summary = response['choices'][0]['message']['content']
+        st.success("✅ ChatGPT Responded")
+        st.write(gpt_summary)
 
-    # Gemini Summary
-    with gemini_col:
-        st.subheader("🌐 Gemini Summary")
-        try:
-            gemini_model = genai.GenerativeModel("models/gemini-1.5-pro")  # ✅ Fixed model name
-            gemini_response = gemini_model.generate_content(prompt)
-            st.success("✅ Gemini Responded")
-            st.markdown(gemini_response.text)
-        except Exception as e:
-            st.error(f"❌ Gemini Error:\n\n{str(e)}")
+    except Exception as e:
+        st.error(f"❌ ChatGPT Error:\n\n{e}")
 
-    # Show raw text
-    st.markdown("""
-    ### 🗂 Raw Text (Used for Summary) ▸
-    """)
+    st.markdown("## 🌐 Gemini Summary")
+    try:
+        model = genai.GenerativeModel(model_name="gemini-1.5-pro-latest")
+        gemini_response = model.generate_content(raw_prompt)
+        st.success("✅ Gemini Responded")
+        st.write(gemini_response.text)
+
+    except Exception as e:
+        st.error(f"❌ Gemini Error:\n\n{e}")
+
+    st.markdown("## 🗂️ Raw Text (Used for Summary)")
     with st.expander("Click to view raw input"):
-        st.code(prompt)
+        st.code(raw_prompt)
