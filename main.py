@@ -11,9 +11,6 @@ plt.switch_backend('agg')
 # --- Tool Functions ---
 
 def generate_price_chart(tickers_string):
-    """
-    Directly generates a price chart and returns it as an image buffer.
-    """
     tickers = [ticker.strip().upper() for ticker in tickers_string.split(',') if ticker.strip()]
     if not tickers: return "No tickers provided."
     raw_data = yf.download(tickers, period='1y', progress=False)
@@ -43,10 +40,7 @@ def generate_price_chart(tickers_string):
     plt.close(fig)
     return buf
 
-def Google_Search_for_news(query):
-    """
-    This function is used by the AI agent.
-    """
+def Google Search_for_news(query):
     try:
         api_key = st.secrets["GOOGLE_API_KEY"]
         cse_id = st.secrets["GOOGLE_CSE_ID"]
@@ -81,16 +75,18 @@ if st.button("Generate Chart"):
     else:
         st.warning("Please enter at least one ticker for the chart.")
 
-st.markdown("---") # Visual separator
+st.markdown("---") 
 
 # --- Section 2: AI Research Assistant ---
 st.header("🤖 AI Research Assistant")
 
 if 'agent_executor' not in st.session_state:
     from langchain_google_genai import ChatGoogleGenerativeAI
-    from langchain.agents import Tool, AgentExecutor, create_react_agent, hub
+    from langchain.agents import Tool, AgentExecutor, create_react_agent
+    from langchain import hub # CORRECTED IMPORT
+    
     llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=st.secrets["GOOGLE_API_KEY"])
-    tools = [Tool(name="Google_Search_for_news", func=Google_Search_for_news, description="Use to search for recent news on a company or topic.")]
+    tools = [Tool(name="Google Search_for_news", func=Google Search_for_news, description="Use to search for recent news on a company or topic.")]
     prompt = hub.pull("hwchase17/react")
     agent = create_react_agent(llm, tools, prompt)
     st.session_state.agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
