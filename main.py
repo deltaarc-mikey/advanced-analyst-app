@@ -1,117 +1,106 @@
+# delta_ghost_dashboard.py
 import streamlit as st
 import pandas as pd
-import json
+import yfinance as yf
+import matplotlib.pyplot as plt
+import pandas_ta as ta
 import datetime
-from docx import Document
-from fpdf import FPDF
+import praw
+from pytrends.request import TrendReq
+import io
 
-# Set Streamlit page config
-st.set_page_config(page_title="Delta Ghost AI Trade Engine", layout="wide")
+# --- SETUP ---
+st.set_page_config(layout="wide")
+st.title("📊 Delta Ghost AI Trading Dashboard")
 
-# App Title
-st.title("Delta Ghost AI Trade Engine")
-st.markdown("Built with Gemini + ChatGPT + Unusual Whales Intelligence")
+# --- REDDIT CONFIG ---
+reddit = praw.Reddit(
+    client_id=st.secrets["REDDIT_CLIENT_ID"],
+    client_secret=st.secrets["REDDIT_CLIENT_SECRET"],
+    user_agent=st.secrets["REDDIT_USER_AGENT"]
+)
 
-# Tabs
-tabs = st.tabs(["📊 Screener & Charts", "📈 AI Trade Signal Center", "📁 Options & Uploads"])
+# --- GOOGLE TRENDS SETUP ---
+pytrends = TrendReq(hl='en-US', tz=360)
 
-# --- TAB 1: Screener ---
-with tabs[0]:
-    st.header("Step 1: Screener & Technical Charts")
+# --- TICKER INPUT ---
+st.header("📈 Stock Price and Indicator Chart")
+ticker_input = st.text_input("Enter ticker(s):", value="AAPL, TSLA")
 
-    tickers = st.text_area("Paste top tickers (e.g., NVDA, AMD, VRT):", height=100)
-    if tickers:
-        symbols = [x.strip().upper() for x in tickers.split(",") if x.strip()]
-        st.success(f"🟢 {len(symbols)} symbols loaded.")
-        st.write(symbols)
+def get_price_chart(tickers):
+    tickers = [t.strip().upper() for t in tickers.split(',') if t.strip()]
+    df = yf.download(tickers, period="6mo")['Adj Close']
+    if isinstance(df, pd.Series):
+        df = df.to_frame()
 
-# --- TAB 2: AI Trade Signal Generator ---
-with tabs[1]:
-    st.header("Step 2: AI Signal Engine")
+    fig, ax = plt.subplots(figsize=(12, 6))
+    df.plot(ax=ax)
+    ax.set_title("Stock Price - Last 6 Months")
+    ax.grid(True)
+    st.pyplot(fig)
 
-    col1, col2 = st.columns(2)
-    with col1:
-        gemini_text = st.text_area("Paste Gemini signal (from Google Trends or Chat Export):", height=200)
-    with col2:
-        gpt_output = st.text_area("Paste ChatGPT output (LLM output from prompt):", height=200)
+    return df
 
-    if st.button("🧠 Generate Trade Plan"):
-        if gemini_text or gpt_output:
-            st.subheader("📋 AI-Generated Trade Summary")
+if st.button("Generate Chart"):
+    chart_data = get_price_chart(ticker_input)
+    if len(chart_data.columns) == 1:
+        ticker = chart_data.columns[0]
+        df = yf.download(ticker, period="6mo")
+        df.ta.rsi(length=14, append=True)
+        df.ta.sma(length=20, append=True)
 
-            summary = f"""### 🔍 Summary:
-**Gemini Insights:**  
-{gemini_text if gemini_text else 'N/A'}
+        fig2, ax2 = plt.subplots(figsize=(12, 6))
+        df[['Adj Close', 'SMA_20']].plot(ax=ax2)
+        ax2.set_title(f"{ticker} with SMA")
+        ax2.grid(True)
+        st.pyplot(fig2)
 
-**ChatGPT Logic:**  
-{gpt_output if gpt_output else 'N/A'}
+        fig3, ax3 = plt.subplots(figsize=(12, 3))
+        df['RSI_14'].plot(ax=ax3, color='orange')
+        ax3.axhline(70, color='red', linestyle='--')
+        ax3.axhline(30, color='green', linestyle='--')
+        ax3.set_title("RSI Indicator")
+        st.pyplot(fig3)
 
-**🛠️ Recommended Actions:**  
-- Review tickers for technical confirmation  
-- Queue limit or market orders based on trade confidence  
-- Cross-verify against Unusual Whales / Barchart setups"""
+# --- REDDIT SENTIMENT ---
+st.header("📢 Reddit Sentiment Scanner")
+subreddits = ["stocks", "wallstreetbets", "options"]
+sentiment_results = []
 
-            st.markdown(summary)
+def scan_reddit():
+    for sub in subreddits:
+        subreddit = reddit.subreddit(sub)
+        for post in subreddit.hot(limit=15):
+            sentiment_results.append({
+                "Subreddit": sub,
+                "Title": post.title,
+                "Score": post.score,
+                "Comments": post.num_comments,
+                "URL": post.url
+            })
+    return pd.DataFrame(sentiment_results)
 
-            # Download Word
-            doc = Document()
-            doc.add_heading("Delta Ghost Trade Summary", 0)
-            doc.add_paragraph(f"Date: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-            doc.add_heading("Gemini Output", level=1)
-            doc.add_paragraph(gemini_text)
-            doc.add_heading("ChatGPT Output", level=1)
-            doc.add_paragraph(gpt_output)
-            doc.add_heading("Recommended Strategy", level=1)
-            doc.add_paragraph("Review tickers for confirmation. Queue trade setups or alerts.")
+if st.button("Scan Reddit Now"):
+    st.info("Fetching sentiment... this may take a moment.")
+    reddit_df = scan_reddit()
+    st.dataframe(reddit_df)
 
-            word_file = "/mnt/data/DeltaGhost_Trade_Summary.docx"
-            doc.save(word_file)
-            st.download_button("⬇️ Download Word Report", data=open(word_file, "rb"), file_name="Trade_Summary.docx")
+# --- GOOGLE TRENDS ---
+st.header("🌐 Google Trends")
+topics = st.text_input("Enter topic(s) for trend scan (comma-separated):", value="AI stocks, Nvidia, inflation")
 
-            # Download PDF
-            pdf = FPDF()
-            pdf.add_page()
-            pdf.set_font("Arial", size=12)
-            pdf.multi_cell(0, 10, f"Delta Ghost Trade Summary\n\nDate: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-            pdf.multi_cell(0, 10, f"\nGemini Output:\n{gemini_text}")
-            pdf.multi_cell(0, 10, f"\nChatGPT Output:\n{gpt_output}")
-            pdf.multi_cell(0, 10, "\nRecommended Strategy:\nReview tickers for confirmation. Queue trade setups or alerts.")
-            pdf_file = "/mnt/data/DeltaGhost_Trade_Summary.pdf"
-            pdf.output(pdf_file)
-            st.download_button("⬇️ Download PDF Report", data=open(pdf_file, "rb"), file_name="Trade_Summary.pdf")
-        else:
-            st.warning("Please paste at least one AI input to generate a trade plan.")
+def fetch_google_trends(keywords):
+    kw_list = [k.strip() for k in keywords.split(',') if k.strip()]
+    pytrends.build_payload(kw_list, cat=0, timeframe='today 3-m', geo='US')
+    return pytrends.interest_over_time()
 
-# --- TAB 3: Upload + Webhook ---
-with tabs[2]:
-    st.header("Step 3: Upload Options Chains + TradingView Alerts")
+if st.button("Fetch Google Trends"):
+    trends_data = fetch_google_trends(topics)
+    if not trends_data.empty:
+        st.line_chart(trends_data.drop(columns=['isPartial']))
+    else:
+        st.warning("No trend data available for those terms.")
 
-    uploaded_file = st.file_uploader("📁 Upload options chain CSV or alert JSON", type=["csv", "json"])
-    if uploaded_file:
-        filename = uploaded_file.name
-        st.success(f"Uploaded: {filename}")
-
-        if filename.endswith(".csv"):
-            df = pd.read_csv(uploaded_file)
-            st.write(df.head())
-
-        elif filename.endswith(".json"):
-            alert_data = json.load(uploaded_file)
-            st.json(alert_data)
-
-            if isinstance(alert_data, dict):
-                st.subheader("🧠 Auto-Generated Alert Summary")
-                ticker = alert_data.get("ticker") or alert_data.get("symbol", "Unknown")
-                reason = alert_data.get("reason", "No reason provided.")
-                strike = alert_data.get("strike", "N/A")
-                expiry = alert_data.get("expiry", "N/A")
-
-                st.markdown(f"""📌 **Trade Alert Received**  
-- Ticker: `{ticker}`  
-- Reason: *{reason}*  
-- Strike: `{strike}`  
-- Expiry: `{expiry}`  
-- Action: Review chart + confirm order manually in TastyTrade  
-""")
-            else:
-                st.warning("JSON does not match expected alert format.")
+# --- SUMMARY ---
+st.markdown("---")
+st.caption("Powered by Delta Ghost — Reddit, Google Trends, AI Intelligence, and Technical Analysis")
