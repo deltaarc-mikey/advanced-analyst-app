@@ -13,3 +13,4 @@ langchain
 langchain-google-genai
 plotly
 python-docx
+pip install tastytrade
