@@ -12,8 +12,11 @@ import openai
 import os
 from datetime import datetime
 
+#st.set_page_config(layout="wide")
+
 # --- Streamlit Layout ---
-st.set_page_config(layout="wide")
+st.set_page_config(page_title="Delta Ghost: Options AI Advanced Analyst", layout="wide")
+st.title("📈 Delta Ghost: AI-Powered Options Intelligence")
 st.sidebar.title("📊 Delta Ghost AI Trading Panel")
 selected_tab = st.sidebar.radio("Navigate", ["Enter Ticker", "Reddit + Trends", "AI Trade Signal Center"])
 
